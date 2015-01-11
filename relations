@@ -7,13 +7,31 @@ GIT = <git> ;
 ORIGIN = "https://github.com/LaMaisonOrchard/DSire.git";
 BRANCH = master;
 
+DFLAGS = dw -g -m64 -O -op;
 
-TARGET | .git
+TARGET | .git dsh sire
 {
 }
 
 
-.git |
+
+// SIRE dependencies ////////////////////////////////////////////////
+
+sire | sire.d
+{
+  $(DMD) $(DEPS) -of$(TARGET)
+}
+
+
+// MSH dependencies ////////////////////////////////////////////////
+
+dsh | dsh.d
+{
+  $(DMD) $(DEPS) -of$(TARGET)
+}
+
+// GIT dependencies ////////////////////////////////////////////////
+.git | CREATE |
 {
   rm relations
   $(GIT) clone $(ORIGIN) -b $(BRANCH) .
