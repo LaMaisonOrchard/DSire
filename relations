@@ -1,0 +1,36 @@
+
+
+SHELL = <sh> ;
+DMD = <dmd> ;
+GIT = <git> ;
+
+ORIGIN = "https://github.com/LaMaisonOrchard/DSire.git";
+BRANCH = master;
+
+
+TARGET | .git
+{
+}
+
+
+.git |
+{
+  rm relations
+  $(GIT) clone $(ORIGIN) -b $(BRANCH) .
+}
+
+pull |
+{
+  $(GIT) pull
+}
+
+push
+{
+  $(GIT) push
+}
+
+commit
+{
+  $(GIT) commit -a
+}
+
