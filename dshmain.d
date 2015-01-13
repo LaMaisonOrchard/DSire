@@ -1,4 +1,6 @@
 import std.stdio;
+import std.process;
+import dsh;
 
 int main(string args[])
 {
@@ -12,10 +14,15 @@ int main(string args[])
     }
     scope(exit) input.close();
     
+    auto shell = new Dsh(stdout, stderr, environment.toAA());
+    
     foreach (line; input.byLine())
     {
-        writeln(line);
+        if (!shell.run(line))
+        {
+	  break;
+	}
     }
     
-    return status;
+    return shell.ExitStatus();
 }

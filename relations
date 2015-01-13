@@ -9,7 +9,7 @@ BRANCH = master;
 
 DFLAGS = dw -g -m64 -O -op;
 
-TARGET | .git dsh sire
+TARGET | .git d-sh sire
 {
 }
 
@@ -25,7 +25,7 @@ sire | sire.d
 
 // MSH dependencies ////////////////////////////////////////////////
 
-dsh | dsh.d
+d-sh | dshmain.d lib/dsh.d
 {
   $(DMD) $(DEPS) -of$(TARGET)
 }
@@ -50,5 +50,10 @@ push
 commit
 {
   $(GIT) commit -a
+}
+
+amend
+{
+  $(GIT) commit --amend -a
 }
 
