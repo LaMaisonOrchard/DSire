@@ -1,0 +1,13 @@
+1) Back quote expansion
+   The commond is run in a sub-shell and the output split in to space separated
+   arguments (taking into account double quotes).
+   
+2) Environment variable expansion.
+
+3) #! on first line redirects input to another shell/executable.
+
+4) 'cd' command
+
+5) wild card directory/file name expansion.
+
+6) 'git' command (stub then full)
