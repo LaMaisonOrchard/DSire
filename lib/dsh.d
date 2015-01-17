@@ -31,6 +31,11 @@ public class Dsh
     this.env     = env;
   }
   
+  public int ExitStatus()
+  {
+    return exitStatus;
+  }
+  
   /////////////////////////////////////////////////////
   //
   // Execute one of more dsh commands.
@@ -60,7 +65,21 @@ public class Dsh
 	if (input[0] == '\r')
 	{
 	  // EOL
-	  more = eol(parseState, line, entry);
+	  if (parseState == state.DOUBLE_QUOTE)
+	  {
+	    err_fp.writeln("Unterminated quotes");
+	    more = false;
+	  }
+	  else if (parseState == state.BACK_QUOTE)
+	  {
+	    err_fp.writeln("Unterminated back quotes");
+	    more = false;
+	  }
+	  else
+	  {
+	    more = eol(parseState, line, entry);
+	  }
+	  
 	  entry = entry[0..0];
 	  line  = line [0..0];
 	  
@@ -73,7 +92,21 @@ public class Dsh
 	else if (input[0] == '\n')
 	{
 	  // EOL
-	  more = eol(parseState, line, entry);
+	  if (parseState == state.DOUBLE_QUOTE)
+	  {
+	    err_fp.writeln("Unterminated quotes");
+	    more = false;
+	  }
+	  else if (parseState == state.BACK_QUOTE)
+	  {
+	    err_fp.writeln("Unterminated back quotes");
+	    more = false;
+	  }
+	  else
+	  {
+	    more = eol(parseState, line, entry);
+	  }
+	  
 	  entry = entry[0..0];
 	  line  = line [0..0];
 	}
@@ -258,7 +291,20 @@ public class Dsh
     }
     
     // EOL
-    more = eol(parseState, line, entry);
+    if (parseState == state.DOUBLE_QUOTE)
+    {
+      err_fp.writeln("Unterminated quotes");
+      more = false;
+    }
+    else if (parseState == state.BACK_QUOTE)
+    {
+      err_fp.writeln("Unterminated back quotes");
+      more = false;
+    }
+    else
+    {
+      more = eol(parseState, line, entry);
+    }
     entry = entry[0..0];
     line  = line [0..0];
     
@@ -402,31 +448,35 @@ public class Dsh
 	case "echo":
 	  const(char)[][] items = expanded[1..$];
 	  
-	  if (out_buf !is null)
-	  {
-	    if (items.length > 0)
-	    {	
-	      out_buf.write(items[0]);
-	      foreach(const(char)[] item; items[1..$])
+	  if (items.length > 0)
+	  {	
+	    if (containsSpaces(items[0]))
+	    {
+	      write('\"');
+	      write(items[0]);
+	      write('\"');
+	    }
+	    else
+	    {
+	      write(items[0]);
+	    }
+	    
+	    foreach(const(char)[] item; items[1..$])
+	    {
+	      write(" ");
+	      if (containsSpaces(item))
 	      {
-		out_buf.write(" ");
-		out_buf.write(item);
+		write('\"');
+		write(item);
+		write('\"');
+	      }
+	      else
+	      {
+		write(item);
 	      }
 	    }
 	  }
-	  else
-	  {
-	    if (items.length > 0)
-	    {	
-	      out_fp.write(items[0]);
-	      foreach(const(char)[] item; items[1..$])
-	      {
-		out_fp.write(" ");
-		out_fp.write(item);
-	      }
-	    }
-	    out_fp.writeln();
-	  }
+	  writeln();
 	  
 	  // No errors
 	  exitStatus = 0;
@@ -446,7 +496,7 @@ public class Dsh
 	      
 	      while (0 < pipes.stdout.readln(buffer))
 	      {
-		out_buf.write(buffer);
+		write(buffer);
 	      }
 	    }
 	    else
@@ -468,10 +518,37 @@ public class Dsh
     return more;
   }
   
-  int ExitStatus()
+  void write(const(char)[] arg ...)
   {
-    return exitStatus;
+    if (out_buf !is null)
+    {
+      out_buf.write(arg);
+    }
+    else
+    {
+      out_fp.write(arg);
+    }
   }
+  
+  void writeln(const(char)[] arg ...)
+  {
+    if (out_buf !is null)
+    {
+      out_buf.writeln(arg);
+    }
+    else
+    {
+      out_fp.writeln(arg);
+    }
+  }
+  
+  bool containsSpaces(const(char)[] text)
+  {
+    // STUB
+    return false;
+  }
+  
+  
   OutBuffer      out_buf;
   File           out_fp;
   File           err_fp;
