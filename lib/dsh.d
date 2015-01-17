@@ -164,14 +164,14 @@ public class Dsh
 	      if (isWhite(input[0]))
 	      {
 		// End of the entry
-		line ~= Element(parseState, entry);
+		line ~= Element(this, parseState, entry);
 		entry = entry[0..0];
 		parseState = state.SPACE;
 	      }
 	      else if (input[0] == '\"')
 	      {
 		// End of the entry
-		line ~= Element(parseState, entry);
+		line ~= Element(this, parseState, entry);
 		entry = entry[0..0];
 		
 		// Consume the start quote
@@ -180,7 +180,7 @@ public class Dsh
 	      else if (input[0] == '`')
 	      {
 		// End of the entry
-		line ~= Element(parseState, entry);
+		line ~= Element(this, parseState, entry);
 		entry = entry[0..0];
 		
 		// Consume the start quote
@@ -219,7 +219,7 @@ public class Dsh
 	      if (input[0] == '\"')
 	      {
 		// End of the entry
-		line ~= Element(parseState, entry);
+		line ~= Element(this, parseState, entry);
 		entry = entry[0..0];
 		
 		// Consume the end quote
@@ -251,7 +251,7 @@ public class Dsh
 	      if (input[0] == '`')
 	      {
 		// End of the entry
-		line ~= Element(parseState, entry);
+		line ~= Element(this, parseState, entry);
 		entry = entry[0..0];
 		
 		// Consume the end quote
@@ -325,7 +325,7 @@ public class Dsh
     {
       if (entry.length > 0)
       {
-	line ~= Element(parseState, entry);
+	line ~= Element(this, parseState, entry);
       }
       parseState = state.SPACE;
     }
@@ -354,10 +354,11 @@ public class Dsh
   //
   private struct Element
   {
-    this(state type, const(char)[] arg)
+    this(Dsh parent, state type, const(char)[] arg)
     {
-      this.type = type;
-      this.arg  = arg.idup;
+      this.parent = parent;
+      this.type   = type;
+      this.arg    = arg.idup;
     }
     
     /////////////////////////////////////////////////////
@@ -369,23 +370,58 @@ public class Dsh
     //
     const(char)[][] expand()
     {
-      const(char)[] rtn;
-      
-      rtn = expandVariables(this.arg);
-      
       switch(type)
       {
 	default:
 	  return [""];  // Should never get here
 	  
 	case state.ARG:      
-	  return [rtn];
+	  return [expandVariables(this.arg)];
 	  
 	case state.DOUBLE_QUOTE:      
-	  return [rtn];
+	  return [expandVariables(this.arg)];
 	  
-	case state.BACK_QUOTE:      
-	  return [rtn];
+	case state.BACK_QUOTE: 
+	  auto output = new OutBuffer();
+	  auto shell  = new Dsh(output, parent.err_fp, parent.env);
+	  
+	  shell.run(this.arg);
+	  auto text = output.toString();
+	  
+	  const(char)[][] args;
+	  int s = 0;
+	  int e = 0;
+	  while (e < text.length)
+	  {
+	    // Strip white space
+	    while ((e < text.length) && isWhite(text[e])) e++;
+	    
+	    if (e >= text.length)
+	    {
+	      // The end
+	    }
+	    else if (text[e] == '\"')
+	    {
+	      // Quoted argument
+	      e++;
+	      s = e;
+	      while ((e < text.length) && (text[e] != '\"')) e++;
+	      
+	      args ~= text[s..e];
+	    }
+	    else
+	    {
+	      // Unquoted argument
+	      s = e;
+	      while ((e < text.length) && !isWhite(text[e])) e++;
+	      
+	      if (s != e)
+	      {
+		args ~= text[s..e];
+	      }
+	    }
+	  }
+	  return args;
       }
     }
     
@@ -397,6 +433,7 @@ public class Dsh
     
     state  type;
     string arg;
+    Dsh    parent;
   };
   
   /////////////////////////////////////////////////////
@@ -526,7 +563,7 @@ public class Dsh
     }
     else
     {
-      out_fp.write(arg);
+      out_fp.write(arg);out_fp.flush();
     }
   }
   
@@ -534,7 +571,8 @@ public class Dsh
   {
     if (out_buf !is null)
     {
-      out_buf.writeln(arg);
+      out_buf.write(arg);
+      out_buf.write(" ");  // Use spaces to separate rather than EOL
     }
     else
     {
