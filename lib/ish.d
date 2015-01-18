@@ -7,11 +7,11 @@ import std.conv;
 import std.outbuffer; 
 
 
-public class Dsh
+public class Ish
 {
   /////////////////////////////////////////////////////
   //
-  // Create a dsh interpreter
+  // Create a ish interpreter
   //
   this(File out_fp, File err_fp, string[string] env)
   {
@@ -22,7 +22,7 @@ public class Dsh
   
   /////////////////////////////////////////////////////
   //
-  // Create a dsh interpreter
+  // Create a ish interpreter
   //
   this(OutBuffer out_buf, File err_fp, string[string] env)
   {
@@ -38,7 +38,7 @@ public class Dsh
   
   /////////////////////////////////////////////////////
   //
-  // Execute one of more dsh commands.
+  // Execute one of more ish commands.
   //
   // RETURN False is returned in the shell exits
   //
@@ -354,7 +354,7 @@ public class Dsh
   //
   private struct Element
   {
-    this(Dsh parent, state type, const(char)[] arg)
+    this(Ish parent, state type, const(char)[] arg)
     {
       this.parent = parent;
       this.type   = type;
@@ -383,7 +383,7 @@ public class Dsh
 	  
 	case state.BACK_QUOTE: 
 	  auto output = new OutBuffer();
-	  auto shell  = new Dsh(output, parent.err_fp, parent.env);
+	  auto shell  = new Ish(output, parent.err_fp, parent.env);
 	  
 	  shell.run(this.arg);
 	  auto text = output.toString();
@@ -433,7 +433,7 @@ public class Dsh
     
     state  type;
     string arg;
-    Dsh    parent;
+    Ish    parent;
   };
   
   /////////////////////////////////////////////////////

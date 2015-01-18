@@ -1,6 +1,6 @@
 import std.stdio;
 import std.process;
-import dsh;
+import ish;
 
 int main(string args[])
 {
@@ -14,7 +14,7 @@ int main(string args[])
     }
     scope(exit) input.close();
     
-    auto shell = new Dsh(stdout, stderr, environment.toAA());
+    auto shell = new Ish(stdout, stderr, environment.toAA());
     
     foreach (line; input.byLine())
     {

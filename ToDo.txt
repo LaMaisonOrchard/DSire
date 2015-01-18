@@ -1,6 +1,15 @@
+ISH
+---
+
+ISH is a simple scripting language for running simple build scripts. The purpose
+of ISH is to provide a platform independent way of running build commands from SIRE.
+ISH can be run as an interpreter with in SIRE making a SIRE a sinble file build
+solution.
+
 1) Back quote expansion
    The commond is run in a sub-shell and the output split in to space separated
    arguments (taking into account double quotes).
+   -- DONE
    
 2) Environment variable expansion.
 
@@ -11,3 +20,18 @@
 5) wild card directory/file name expansion.
 
 6) 'git' command (stub then full)
+
+7) Rename dsh to ish
+   -- DONE
+
+8) Variable assignment
+
+9) If-then elif-else
+
+10) foreach
+
+
+SIRE
+----
+
+1) Start
