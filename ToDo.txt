@@ -12,6 +12,7 @@ solution.
    -- DONE
    
 2) Environment variable expansion.
+   -- DONE (uses a simplistic parsing)
 
 3) #! on first line redirects input to another shell/executable.
 

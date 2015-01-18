@@ -257,21 +257,6 @@ public class Ish
 		// Consume the end quote
 		parseState = state.SPACE;
 	      }
-	      else if (input[0] == '\\')
-	      {
-		if (input.length < 2)
-		{
-		  // Illegal escape sequence
-		}
-		else
-		{
-		  // Consume the escape
-		  input = input[1..$];
-		
-		  // Add to the entry
-		  entry ~= input[0];
-		}
-	      }
 	      else
 	      {
 		// Add to the entry
@@ -428,13 +413,153 @@ public class Ish
     const(char)[]expandVariables(const(char)[] arg)
     {
       // STUB
-      return  arg;
+      string rtn;
+      int    i = 0;
+      int    s = i;
+      while (i < arg.length)
+      {	
+	if (arg[i] != '$')
+	{
+	  i += 1;
+	}
+	else if (i == arg.length-1)
+	{
+	  // End of the line
+	  i += 1;
+	}
+	else if (arg[i+1] == '?')
+	{
+	  // Insert return
+	  rtn ~= arg[s..i];
+	  i = i+2;
+	  s = i;
+	  
+	  rtn ~= to!string(parent.ExitStatus());
+	}
+	else if (arg[i+1] != '{')
+	{
+	  // Not a variable
+	  i += 1;
+	}
+	else
+	{
+	  // Variable declaration
+	  rtn ~= arg[s..i];
+	  i = i+2;
+	  s = i;
+	  
+	  // Balance the brackets
+	  int count = 1;
+	  while ((i < arg.length) && (count > 0))
+	  {
+	    if (arg[i] == '{')
+	    {
+	      count += 1;
+	    }
+	    else if (arg[i] == '}')
+	    {
+	      count -= 1;
+	    }
+	    else
+	    {
+	    }
+	    i += 1;
+	  }
+	  
+	  if (count != 0)
+	  {
+	    // Unbalanced brackets TODO
+	  }
+	
+	  rtn ~= expand(arg[s..i-1]);
+	  s = i;
+	}
+      }
+      
+      if (s != i)
+      {
+	rtn ~= arg[s..i];
+      }
+      
+      return rtn;
+    }
+  
+    // Expand the named environment variable
+    private string expand(const(char)[] name)
+    {
+      string nm;
+      
+      // Look for nested environment variable references
+      int    i = 0;
+      int    s = i;
+      while (i < name.length)
+      {	
+	if (name[i] != '$')
+	{
+	  i += 1;
+	}
+	else if (i == name.length-1)
+	{
+	  // End of the name
+	  i += 1;
+	}
+	else if (name[i+1] == '{')
+	{
+	  // Variable declaration
+	  nm ~= name[s..i];
+	  i = i+2;
+	  s = i;
+	  
+	  // Balance the brackets
+	  int count = 1;
+	  while ((i < name.length) && (count > 0))
+	  {
+	    if (name[i] == '{')
+	    {
+	      count += 1;
+	    }
+	    else if (name[i] == '}')
+	    {
+	      count -= 1;
+	    }
+	    else
+	    {
+	    }
+	    i += 1;
+	  }
+	  
+	  if (count != 0)
+	  {
+	    // Unbalanced brackets TODO
+	  }
+	  
+	  nm ~= expand(name[s..i-1]);
+	  s = i;
+	}
+      }
+      
+      // Add the last part to the name
+      if (s != i)
+      {
+	nm ~= name[s..i];
+      }
+      
+      // Expand the names environment variable
+      auto p = (nm in parent.env);
+      if (p is null)
+      {
+	return "";
+      }
+      else
+      {
+	return *p;
+      }
     }
     
     state  type;
     string arg;
     Ish    parent;
-  };
+  }
   
   /////////////////////////////////////////////////////
   //
