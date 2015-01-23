@@ -15,6 +15,7 @@ solution.
    -- DONE (uses a simplistic parsing)
 
 3) #! on first line redirects input to another shell/executable.
+   -- DONE
 
 4) 'cd' command
    -- DONE

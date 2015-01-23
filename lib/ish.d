@@ -17,11 +17,12 @@ public class Ish
    //
    this(File out_fp, File err_fp, string[string] env, string cwd = getcwd())
    {
-      this.out_fp  = out_fp;
-      this.err_fp  = err_fp;
-      this.env     = env;
-      this.cwd     = cwd;
-      env["PWD"]   = cwd;
+      this.first    = true;
+      this.out_fp   = out_fp;
+      this.err_fp   = err_fp;
+      this.env      = env;
+      this.cwd      = cwd;
+      env["PWD"]    = cwd;
    }
    
    /////////////////////////////////////////////////////
@@ -30,16 +31,24 @@ public class Ish
    //
    this(OutBuffer out_buf, File err_fp, string[string] env, string cwd = getcwd())
    {
-      this.out_buf = out_buf;
-      this.err_fp  = err_fp;
-      this.env     = env;
-      this.cwd     = cwd;
-      env["PWD"]   = cwd;
+      this.first    = true;
+      this.out_buf  = out_buf;
+      this.err_fp   = err_fp;
+      this.env      = env;
+      this.cwd      = cwd;
+      env["PWD"]    = cwd;
    }
    
    public int ExitStatus()
    {
-      return exitStatus;
+      // Is there a sub-shell
+      if (sub_fp.isOpen())
+      {
+         sub_fp.close();
+         this.exitStatus = wait(this.sub_pid);
+      }
+      
+      return this.exitStatus;
    }
    
    /////////////////////////////////////////////////////
@@ -50,13 +59,46 @@ public class Ish
    //
    bool run(const(char)[] input)
    {
-      
       auto parseState = state.SPACE;
       
       char[]    entry;
       Element[] line;
       bool      more    = true;
       bool      lineEnd = false;  // Are we at the end of a line
+      
+      // Is this the first input line
+      if (this.first)
+      {
+         first = false;
+         
+         if (input.length > 2)
+         {
+            // Does the line start with a hash bang
+            if ((input[0] == '#') &&
+                (input[1] == '!'))
+            {
+               // Try to start a sub-shell
+               more  = startSubShell(input[2..$]);
+               input = input[0..0];
+            }
+         }
+      }
+       
+      // Is there a sub-shell
+      if (more && sub_fp.isOpen())
+      {
+         // Send the input to the sub-shell
+         this.sub_fp.writeln(input);
+         input = input[0..0];
+         
+         auto rtn = tryWait(this.sub_pid);
+         if (rtn.terminated)
+         {
+            sub_fp.close();
+            more            = false;
+            this.exitStatus = rtn.status;
+         }
+      }
       
       while (more && (input.length > 0))
       {
@@ -343,10 +385,15 @@ public class Ish
          err_fp.writeln("Unterminated back quotes");
          more = false;
       }
-      else
+      else if (line.length > 0)
       {
          more = eol(parseState, line, entry);
       }
+      else
+      {
+         // Nothing to do
+      }
+      
       entry = entry[0..0];
       line  = line [0..0];
       
@@ -354,6 +401,91 @@ public class Ish
       {
          // Implicit line ens at the end of the input
          lineNo  += 1;
+      }
+      
+      return more;
+   }
+   
+   
+   /////////////////////////////////////////////////////
+   //
+   // Start a sub shell using the given command
+   //
+   bool startSubShell(const(char)[]input)
+   {
+      bool more = true;
+      
+      const(char)[][] args;
+      
+      // This must start with an absolute path
+      if (
+          (input.length >= 2) &&
+          (
+           (input[0] == '/')  ||
+           (isAlpha(input[0]) && (input[1] == ':'))
+          )
+         )
+      {
+         while (input.length > 0)
+         {
+            int i = 0;
+            while ((i < input.length) && !isWhite(input[i])) i++;
+            args ~= input[0..i];
+            input = input[i..$];
+            
+            // Remove any white space
+            while ((input.length > 0) && isWhite(input[i]))
+            {
+               if (input[0] == '\r')
+               {
+                  // This is the end of the first line
+                  input = input[1..$];
+                  
+                  if ((input.length > 0) && (input[0] == '\n'))
+                  {
+                     input = input[1..$];
+                  }
+                  break;
+               }
+               else if (input[0] == '\n')
+               {
+                  // This is the end of the first line
+                  input = input[1..$];
+                  break;
+               }
+               else
+               {
+                  // Strip the white space
+                  input = input[1..$];
+               }
+            }
+         }
+         
+         try
+         {
+            auto pipes = pipeProcess(args, Redirect.stdin, this.env, Config.newEnv | Config.suppressConsole, cwd);
+            this.sub_pid = pipes.pid;
+            this.sub_fp  = pipes.stdin;
+            
+            // Pass through any remaining input
+            if (input.length > 0)
+            {
+               this.sub_fp.writeln(input);
+            }
+         }
+         catch (Exception ex)
+         {
+            // Report and errors thrown by the process
+            more = false;
+            err_fp.writeln(ex.msg);
+            exitStatus = -1;
+         }
+      }
+      else
+      {
+         more = false;
+         err_fp.writeln("Illegal sub-shell");
+         exitStatus = -1;
       }
       
       return more;
@@ -989,10 +1121,13 @@ public class Ish
       return false;
    }
    
+   bool first;          // Is this the first line of input
    
    OutBuffer      out_buf;
    File           out_fp;
    File           err_fp;
+   File           sub_fp; // Sub-shell input
+   Pid            sub_pid;
    string[string] env;
    string         cwd;
    int            exitStatus = 0;
