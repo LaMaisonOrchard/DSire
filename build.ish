@@ -1,4 +1,6 @@
 
-
+echo Building ISH ....
 dmd ishmain.d lib/ish.d lib/git.d -ofish
+
+echo Building SIRE ....
 dmd sire.d    lib/ish.d lib/git.d -ofsire

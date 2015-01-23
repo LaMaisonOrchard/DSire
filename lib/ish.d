@@ -728,28 +728,67 @@ public class Ish
                
                break;
                
+            case "copy":
+               const(char)[][] items = expanded[1..$];
+               
+               // No errors
+               exitStatus = 0;
+               
+               if (items.length != 2)
+	       {
+                  // Illeagl args
+               }
+               else
+               {
+                  try
+                  {
+                     copy(items[0], items[1]);
+                  }
+                  catch (Exception ex)
+                  {
+                     // ERROR - TODO
+                  }
+               }
+               
+               break;
+               
+            case "move":
+               const(char)[][] items = expanded[1..$];
+               
+               // No errors
+               exitStatus = 0;
+               
+               if (items.length != 2)
+	       {
+                  // Illeagl args
+               }
+               else
+               {
+                  try
+                  {
+                     rename(items[0], items[1]);
+                  }
+                  catch (Exception ex)
+                  {
+                     // ERROR - TODO
+                  }
+               }
+               
+               break;
+               
             default:
                // Execute the command as a program
                try
                {
-                  if (out_buf !is null)
-                  {
-                     // Use a pipe to capture stdout as text to be processed
+                  // Use a pipe to capture stdout as text to be processed
                      
-                     char[] buffer;
-                     auto pipes = pipeProcess(expanded, Redirect.stdout);
-                     scope(exit) wait(pipes.pid);
+                  char[] buffer;
+                  auto pipes = pipeProcess(expanded, Redirect.stdout, env, Config.newEnv | Config.suppressConsole);
+                  scope(exit) wait(pipes.pid);
                      
-                     while (0 < pipes.stdout.readln(buffer))
-                     {
-                        write(buffer);
-                     }
-                  }
-                  else
+                  while (0 < pipes.stdout.readln(buffer))
                   {
-                     // Run the program passing on the stdout
-                     auto pid   = spawnProcess(expanded, stdin, out_fp, err_fp, env);
-                     exitStatus = wait(pid);
+                     write(buffer);
                   }
                }
                catch(Exception ex)

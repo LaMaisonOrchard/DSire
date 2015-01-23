@@ -34,6 +34,17 @@ solution.
 11) 'touch' command
    -- DONE
 
+12) 'unlink' command
+
+13) 'move' command  'file rename'
+   -- DONE - needs to handle directories - needs error handling
+
+14) 'copy' command  'file copy'
+   -- DONE - needs to handle directories - needs error handling
+
+15) The output from the sub-processes is not being passed to the output on Windows.
+   -- DONE - STDERR may still be lost - this has not been tested
+
 
 SIRE
 ----
