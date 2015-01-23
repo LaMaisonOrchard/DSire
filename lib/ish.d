@@ -15,22 +15,26 @@ public class Ish
    //
    // Create a ish interpreter
    //
-   this(File out_fp, File err_fp, string[string] env)
+   this(File out_fp, File err_fp, string[string] env, string cwd = getcwd())
    {
       this.out_fp  = out_fp;
       this.err_fp  = err_fp;
       this.env     = env;
+      this.cwd     = cwd;
+      env["PWD"]   = cwd;
    }
    
    /////////////////////////////////////////////////////
    //
    // Create a ish interpreter
    //
-   this(OutBuffer out_buf, File err_fp, string[string] env)
+   this(OutBuffer out_buf, File err_fp, string[string] env, string cwd = getcwd())
    {
       this.out_buf = out_buf;
       this.err_fp  = err_fp;
       this.env     = env;
+      this.cwd     = cwd;
+      env["PWD"]   = cwd;
    }
    
    public int ExitStatus()
@@ -427,7 +431,7 @@ public class Ish
                
             case state.BACK_QUOTE: 
                auto output = new OutBuffer();
-               auto shell  = new Ish(output, parent.err_fp, parent.env);
+               auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd);
                
                shell.run(this.arg);
                auto text = output.toString();
@@ -641,6 +645,9 @@ public class Ish
       // Is there anything to process
       if (expanded.length > 0)
       {
+         // The default is no error
+         exitStatus = 0;
+                  
          // Process the command
          switch (expanded[0])
          {
@@ -658,11 +665,6 @@ public class Ish
                      err_fp.writeln("Bad argument to exit : ", expanded[1]);
                      exitStatus = -1;
                   }
-               }
-               else
-               {
-                  // The default is no error
-                  exitStatus = 0;
                }
                break;
                
@@ -703,6 +705,134 @@ public class Ish
                exitStatus = 0;
                break;
                
+            case "cd":
+               const(char)[][] items = expanded[1..$];
+               
+               if (items.length != 1)
+               {  
+                  // Illeagl args
+                  err_fp.writeln("cd <dir>");
+                  exitStatus = -1;      
+               }
+               else
+               {
+                  try
+                  {
+                     // Try to change directory
+                     chdir(items[0]);
+                     cwd = getcwd();
+                     env["PWD"]   = cwd;
+                  }
+                  catch (Exception ex)
+                  {
+                     err_fp.writeln(ex.msg);
+                     exitStatus = -1;
+                  }
+               }
+               break;
+               
+            case "mkdir":
+               const(char)[][] items = expanded[1..$];
+               
+               // No errors
+               exitStatus = 0;
+               
+               if (items.length == 0)
+               {  
+                  // Illeagl args
+                  err_fp.writeln("mkdir {<directory>}");
+                  exitStatus = -1;      
+               }
+               else
+               {  
+                  foreach(const(char)[] item; items[0..$])
+                  {
+                     try
+                     {
+                        if (!exists(item) || !isDir(item))
+                        {
+                           mkdirRecurse(item);
+                        }
+                     }
+                     catch(Exception ex)
+                     {
+                        // Report and errors thrown by the process
+                        err_fp.writeln(ex.msg);
+                        exitStatus = -1;
+                     }
+                  }
+               }
+               
+               break;
+               
+            case "help":
+               const(char)[][] items = expanded[1..$];
+               
+               // No errors
+               exitStatus = 0;
+               
+               if (items.length == 0)
+               {  
+                  writeln("ish version 1.0.0");
+                  writeln("help <command>");
+               }
+               else
+               {  
+                  switch(items[0])
+                  {
+                     case "exit":
+                        writeln("exit [<exit code>]");
+                        writeln("   Terminate the shell returning the given exit code.");
+                        writeln("   If no exit code is specified the the exit code of the");
+                        writeln("   last command is returned.");
+                        break;
+                        
+                     case "echo":
+                        writeln("echo {<arg>}");
+                        writeln("   Write out the list of arguments. Arguments containing");
+                        writeln("   white space will be quoted.");
+                        break;
+                        
+                     case "cd":
+                        writeln("cd <dir>");
+                        writeln("   Change the current working directory. The environment");
+                        writeln("   variable PWD is updated to reflext the new directory.");
+                        break;
+                        
+                     case "mkdir":
+                        writeln("mkdir {<directory>}");
+                        writeln("   Create the specified directory paths. No error is reported");
+                        writeln("   if the path already exists.");                        
+                        break;
+                  
+                     case "help":
+                        writeln("help [<command>]");
+                        writeln("   Output help on built is commands.");
+                     break;
+                  
+                     case "touch":
+                        writeln("mkdir {<file>}");
+                        writeln("   Create the file of update is modified time to the current time.");     
+                        
+                        break;
+                        
+                     case "copy":
+                        writeln("copy <from> <to>");
+                        writeln("   Copy the file from one location to another.");   
+                        break;
+                        
+                     case "move":
+                        writeln("move <from> <to>");
+                        writeln("   Move the file from one location to another.");                        
+                     break;
+                     
+                     default:
+                        break;
+                  }
+               }
+               
+               break;
+               
             case "touch":
                const(char)[][] items = expanded[1..$];
                
@@ -715,7 +845,16 @@ public class Ish
                   {
                      try
                      {
-                        setTimes(item, Clock.currTime, Clock.currTime);
+                        if (exists(item))
+                        {
+                           setTimes(item, Clock.currTime, Clock.currTime);
+                        }
+                        else
+                        {
+                           File fp;
+                           fp.open(item.idup, "w");
+                           scope(exit) fp.close();
+                        }
                      }
                      catch(Exception ex)
                      {
@@ -737,6 +876,8 @@ public class Ish
                if (items.length != 2)
 	       {
                   // Illeagl args
+                  err_fp.writeln("copy <from> <to>");
+                  exitStatus = -1;
                }
                else
                {
@@ -746,7 +887,9 @@ public class Ish
                   }
                   catch (Exception ex)
                   {
-                     // ERROR - TODO
+                     // Report and errors thrown by the process
+                     err_fp.writeln(ex.msg);
+                     exitStatus = -1;
                   }
                }
                
@@ -761,6 +904,8 @@ public class Ish
                if (items.length != 2)
 	       {
                   // Illeagl args
+                  err_fp.writeln("move <from> <to>");
+                  exitStatus = -1;
                }
                else
                {
@@ -770,7 +915,9 @@ public class Ish
                   }
                   catch (Exception ex)
                   {
-                     // ERROR - TODO
+                     // Report and errors thrown by the process
+                     err_fp.writeln(ex.msg);
+                     exitStatus = -1;
                   }
                }
                
@@ -783,8 +930,8 @@ public class Ish
                   // Use a pipe to capture stdout as text to be processed
                      
                   char[] buffer;
-                  auto pipes = pipeProcess(expanded, Redirect.stdout, env, Config.newEnv | Config.suppressConsole);
-                  scope(exit) wait(pipes.pid);
+                  auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+                  scope(exit) exitStatus = wait(pipes.pid);
                      
                   while (0 < pipes.stdout.readln(buffer))
                   {
@@ -795,6 +942,7 @@ public class Ish
                {
                   // Report and errors thrown by the process
                   err_fp.writeln(ex.msg);
+                  exitStatus = -1;
                }
                break;
          }
@@ -846,6 +994,7 @@ public class Ish
    File           out_fp;
    File           err_fp;
    string[string] env;
+   string         cwd;
    int            exitStatus = 0;
    int            lineNo  = 1;
 }
