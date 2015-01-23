@@ -7,6 +7,7 @@ import std.conv;
 import std.outbuffer; 
 import std.file; 
 import std.datetime;
+import url;
 
 
 public class Ish
@@ -417,49 +418,46 @@ public class Ish
       
       const(char)[][] args;
       
-      // This must start with an absolute path
-      if (
-          (input.length >= 2) &&
-          (
-           (input[0] == '/')  ||
-           (isAlpha(input[0]) && (input[1] == ':'))
-          )
-         )
+      // Split up the arguments assuming no leading spaces
+      while (input.length > 0)
       {
-         while (input.length > 0)
+         int i = 0;
+         while ((i < input.length) && !isWhite(input[i])) i++;
+         args ~= input[0..i];
+         input = input[i..$];
+         
+         // Remove any white space
+         while ((input.length > 0) && isWhite(input[i]))
          {
-            int i = 0;
-            while ((i < input.length) && !isWhite(input[i])) i++;
-            args ~= input[0..i];
-            input = input[i..$];
-            
-            // Remove any white space
-            while ((input.length > 0) && isWhite(input[i]))
+            if (input[0] == '\r')
             {
-               if (input[0] == '\r')
+               // This is the end of the first line
+               input = input[1..$];
+               
+               if ((input.length > 0) && (input[0] == '\n'))
                {
-                  // This is the end of the first line
-                  input = input[1..$];
-                  
-                  if ((input.length > 0) && (input[0] == '\n'))
-                  {
-                     input = input[1..$];
-                  }
-                  break;
-               }
-               else if (input[0] == '\n')
-               {
-                  // This is the end of the first line
-                  input = input[1..$];
-                  break;
-               }
-               else
-               {
-                  // Strip the white space
                   input = input[1..$];
                }
+               break;
+            }
+            else if (input[0] == '\n')
+            {
+               // This is the end of the first line
+               input = input[1..$];
+               break;
+            }
+            else
+            {
+               // Strip the white space
+               input = input[1..$];
             }
          }
+      }
+      
+      Url name = args[0];
+      // This must start with an absolute path
+      if (((name.scheme  == "file") || (name.scheme.length == 1)) && (name.path[0] == '/'))
+      {
          
          try
          {
