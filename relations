@@ -17,7 +17,7 @@ TARGET | .git ish sire
 
 // SIRE dependencies ////////////////////////////////////////////////
 
-sire | sire.d
+sire | sire.d lib/ish.d lib/git.d
 {
   $(DMD) $(DEPS) -of$(TARGET)
 }
@@ -25,7 +25,7 @@ sire | sire.d
 
 // MSH dependencies ////////////////////////////////////////////////
 
-ish | ishmain.d lib/ish.d
+ish | ishmain.d lib/ish.d lib/git.d
 {
   $(DMD) $(DEPS) -of$(TARGET)
 }

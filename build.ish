@@ -1,0 +1,4 @@
+
+
+dmd ishmain.d lib/ish.d lib/git.d -ofish
+dmd sire.d    lib/ish.d lib/git.d -ofsire
