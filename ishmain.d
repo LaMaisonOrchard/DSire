@@ -1,5 +1,6 @@
 import std.stdio;
 import std.process;
+import std.file; 
 import ish;
 
 int main(string args[])
@@ -14,7 +15,7 @@ int main(string args[])
     }
     scope(exit) input.close();
     
-    auto shell = new Ish(stdout, stderr, environment.toAA());
+    auto shell = new Ish(stdout, stderr, environment.toAA(), getcwd(), args);
     
     foreach (line; input.byLine())
     {

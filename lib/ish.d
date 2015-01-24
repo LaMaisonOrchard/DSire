@@ -16,12 +16,13 @@ public class Ish
    //
    // Create a ish interpreter
    //
-   this(File out_fp, File err_fp, string[string] env, string cwd = getcwd())
+   this(File out_fp, File err_fp, string[string] env, string cwd, string[] args ...)
    {
       this.first    = true;
       this.out_fp   = out_fp;
       this.err_fp   = err_fp;
       this.env      = env;
+      this.args     = args;
       this.cwd      = cwd;
       env["PWD"]    = cwd;
    }
@@ -30,12 +31,13 @@ public class Ish
    //
    // Create a ish interpreter
    //
-   this(OutBuffer out_buf, File err_fp, string[string] env, string cwd = getcwd())
+   this(OutBuffer out_buf, File err_fp, string[string] env, string cwd, string[] args ...)
    {
       this.first    = true;
       this.out_buf  = out_buf;
       this.err_fp   = err_fp;
       this.env      = env;
+      this.args     = args;
       this.cwd      = cwd;
       env["PWD"]    = cwd;
    }
@@ -375,6 +377,8 @@ public class Ish
          input = input[1..$];
       }
       
+      
+      
       // EOL
       if (parseState == state.DOUBLE_QUOTE)
       {
@@ -386,13 +390,9 @@ public class Ish
          err_fp.writeln("Unterminated back quotes");
          more = false;
       }
-      else if (line.length > 0)
-      {
-         more = eol(parseState, line, entry);
-      }
       else
       {
-         // Nothing to do
+         more = eol(parseState, line, entry);
       }
       
       entry = entry[0..0];
@@ -400,7 +400,7 @@ public class Ish
       
       if (!lineEnd)
       {
-         // Implicit line ens at the end of the input
+         // Implicit line end at the end of the input
          lineNo  += 1;
       }
       
@@ -508,8 +508,11 @@ public class Ish
          parseState = state.SPACE;
       }
          
-      // Process the line
-      more = process(line);
+      // Process the line 
+      if (line.length > 0)
+      {
+         more = process(line);
+      }
       
       return more;
    }
@@ -554,14 +557,14 @@ public class Ish
                return [""];  // Should never get here
                
             case state.ARG:      
-               return [expandVariables(this.arg)];
+               return [expandVariables(this.arg)];  // These need to be re-parsed TODO
                
             case state.DOUBLE_QUOTE:      
                return [expandVariables(this.arg)];
                
             case state.BACK_QUOTE: 
                auto output = new OutBuffer();
-               auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd);
+               auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd, parent.args);
                
                shell.run(this.arg);
                auto text = output.toString();
@@ -737,16 +740,7 @@ public class Ish
             nm ~= name[s..i];
          }
          
-         // Expand the names environment variable
-         auto p = (nm in parent.env);
-         if (p is null)
-         {
-            return "";
-         }
-         else
-         {
-            return *p;
-         }
+         return parent.getEnv(nm);
       }
       
       state  type;
@@ -835,6 +829,46 @@ public class Ish
                exitStatus = 0;
                break;
                
+            case "which":
+               const(char)[][] items = expanded[1..$];
+               
+               if (items.length > 0)
+               {      
+                  auto fullPath = getFullPath(items[0].idup);
+                  if (containsSpaces(fullPath))
+                  {
+                     write('\"');
+                     write(fullPath);
+                     write('\"');
+                  }
+                  else
+                  {
+                     write(fullPath);
+                  }
+                  
+                  foreach(const(char)[] item; items[1..$])
+                  {
+                     fullPath = getFullPath(item.idup);
+                     
+                     write(" ");
+                     if (containsSpaces(fullPath))
+                     {
+                        write('\"');
+                        write(fullPath);
+                        write('\"');
+                     }
+                     else
+                     {
+                        write(fullPath);
+                     }
+                  }
+               }
+               writeln();
+               
+               // No errors
+               exitStatus = 0;
+               break;
+               
             case "cd":
                const(char)[][] items = expanded[1..$];
                
@@ -895,6 +929,40 @@ public class Ish
                
                break;
                
+            case "rmdir":
+               const(char)[][] items = expanded[1..$];
+               
+               // No errors
+               exitStatus = 0;
+               
+               if (items.length == 0)
+               {  
+                  // Illeagl args
+                  err_fp.writeln("rmdir {<directory>}");
+                  exitStatus = -1;      
+               }
+               else
+               {  
+                  foreach(const(char)[] item; items[0..$])
+                  {
+                     try
+                     {
+                        if (exists(item) && isDir(item))
+                        {
+                           rmdirRecurse(item);
+                        }
+                     }
+                     catch(Exception ex)
+                     {
+                        // Report and errors thrown by the process
+                        err_fp.writeln(ex.msg);
+                        exitStatus = -1;
+                     }
+                  }
+               }
+               
+               break;
+               
             case "help":
                const(char)[][] items = expanded[1..$];
                
@@ -934,6 +1002,11 @@ public class Ish
                         writeln("   Create the specified directory paths. No error is reported");
                         writeln("   if the path already exists.");                        
                         break;
+                        
+                     case "rmdir":
+                        writeln("rmdir {<directory>}");
+                        writeln("   Delete the specified directory (and sub-directries).");                        
+                        break;
                   
                      case "help":
                         writeln("help [<command>]");
@@ -942,8 +1015,12 @@ public class Ish
                   
                      case "touch":
                         writeln("mkdir {<file>}");
-                        writeln("   Create the file of update is modified time to the current time.");     
-                        
+                        writeln("   Create the file of update is modified time to the current time.");                        
+                        break;
+                  
+                     case "which":
+                        writeln("which {<file>}");
+                        writeln("   Write out the full path of each executable file.");                        
                         break;
                         
                      case "copy":
@@ -1057,15 +1134,50 @@ public class Ish
                // Execute the command as a program
                try
                {
-                  // Use a pipe to capture stdout as text to be processed
-                     
-                  char[] buffer;
-                  auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
-                  scope(exit) exitStatus = wait(pipes.pid);
-                     
-                  while (0 < pipes.stdout.readln(buffer))
+                  auto fullPath = getFullPath(expanded[0].idup);
+                  
+                  if (fullPath.length == 0)
                   {
-                     write(buffer);
+                     // No executable found
+                     err_fp.writeln("No such programs : " ~ expanded[0]);
+                     exitStatus = -1;
+                  }
+                  else if (isScript(fullPath))
+                  {
+                     // Run the file as a script
+                     File input;
+    
+                     input.open(fullPath, "r");
+                     scope(exit) input.close();
+                     
+                     string[] args;
+                     args ~= fullPath;
+                     foreach (const(char)[] arg; expanded[1..$]) args ~= arg.idup;
+                     auto shell  = new Ish(this.err_fp, this.err_fp, this.env, this.cwd, args);
+                     
+                     foreach (inputLine; input.byLine())
+                     {
+                        if (!shell.run(inputLine))
+                        {
+                           break;
+                        }
+                     }
+                     
+                     exitStatus = shell.ExitStatus();
+                  }
+                  else
+                  {
+                     // Use a pipe to capture stdout as text to be processed
+                        
+                     char[] buffer;
+                     expanded[0] = fullPath;
+                     auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+                     scope(exit) exitStatus = wait(pipes.pid);
+                        
+                     while (0 < pipes.stdout.readln(buffer))
+                     {
+                        write(buffer);
+                     }
                   }
                }
                catch(Exception ex)
@@ -1079,6 +1191,225 @@ public class Ish
       }
       
       return more;
+   }
+   
+   /////////////////////////////////////////////////////
+   //
+   // Find the absolute full path to the executable
+   //
+   // RETURN The full path
+   //
+   public string getFullPath(string name)
+   {
+      string tmp;
+      
+      // Check for an absolute path
+      if (absolutePath(name))
+      {
+         // Absolute path
+         return name;
+      }
+      
+      // Is the path specified
+      foreach (ch; name)
+      {
+         if (ch == '/')
+         {
+            tmp = this.cwd ~ "/" ~ name;
+            if (executableFile(tmp))
+            {
+               return tmp;
+            }
+            else
+            {
+               return "";
+            }
+         }
+      }
+      
+version ( Windows )
+{
+      immutable(char) psep = ';';
+      
+      // The directory from which the application loaded.
+      tmp = thisExePath() ~ "/" ~ name;
+      if (executableFile(tmp))
+      {
+         return tmp;
+      }
+      
+      // The current directory for the parent process.
+      tmp = this.cwd ~ "/" ~ name;
+      if (executableFile(tmp))
+      {
+         return tmp;
+      }
+      
+      // The 32-bit Windows system directory.
+      // TODO
+      
+      // The 16-bit Windows system directory.
+      // TODO
+      
+      // The Windows directory.
+      tmp = getEnv("windir");
+      if (tmp.length > 0)
+      {
+         tmp = buildPath(tmp, name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }
+      
+      tmp = getEnv("Windir");
+      if (tmp.length > 0)
+      {
+         tmp = buildPath(tmp, name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }
+      
+      tmp = getEnv("SystemRoot");
+      if (tmp.length > 0)
+      {
+         tmp = buildPath(tmp, name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }
+      
+      tmp = getEnv("SystemRoot") ~ "/System32";
+      if (tmp.length > 0)
+      {
+         tmp = buildPath(tmp, name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }
+      
+      tmp = getEnv("SystemRoot") ~ "/SysWOW64";
+      if (tmp.length > 0)
+      {
+         tmp = buildPath(tmp, name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }      
+}
+else
+{
+      immutable(char) psep = ':';
+      
+}
+
+      // The directories listed in the PATH environment variable.
+      auto path = getEnv("PATH");
+      
+      int i = 0;
+      while (i < path.length)
+      {
+         if (path[i] == psep)
+         {
+            // Is a path specified
+            if (i > 0)
+            {
+               // Combine this with the file name and check if it is an executable
+               tmp = buildPath(path[0..i], name);
+               if (executableFile(tmp))
+               {
+                  return tmp;
+               }
+            }
+            
+            // Strip this element out
+            path = path[i+1.. $];
+            i = 0;
+         }
+         else
+         {
+            i++;
+         }
+      }
+      
+      // Check any remaining path
+      if (path.length > 0)
+      {
+         tmp = buildPath(path[0..$], name);
+         if (executableFile(tmp))
+         {
+            return tmp;
+         }
+      }
+
+      return "";
+   }
+      
+   string buildPath(string path, string name)
+   {
+      if (absolutePath(path))
+      {
+         // Absolute path
+         return path ~ "/" ~ name;
+      }
+      else
+      {
+         // Relative path
+         return this.cwd ~ "/" ~ path ~ "/" ~ name;
+      }
+   }
+   
+   
+   static bool absolutePath(const(char)[] name)
+   {
+      Url tmp = name;
+      return ((tmp.scheme.length == 1) || (tmp.path[0] == '/'));
+   }
+   
+   
+   static bool executableFile(const(char)[] name)
+   {
+      return (exists(name) && isFile(name));
+   }
+   
+    
+   /////////////////////////////////////////////////////
+   //
+   // Is this file an executable script
+   //
+   // RETURN True is a script file
+   //              
+   static public bool isScript(string fullPath)
+   {
+      // Is this executable
+      if (!executableFile(fullPath))
+      {
+         return false;
+      }
+      
+      // Read up to 16 charactor from the file
+      File fp;
+      fp.open(fullPath, "rb");
+      scope(exit) fp.close();
+      
+      char[16] data;
+      fp.rawRead(data);
+      
+      // Are all the charactor printable ASCII or white space
+      foreach (ch; data)
+      {
+         if (!isGraphical(ch) && !isWhite(ch))
+         {
+            return false;
+         }
+      }
+      
+      return true;
    }
    
    void write(const(char)[] arg ...)
@@ -1119,6 +1450,67 @@ public class Ish
       return false;
    }
    
+   string getEnv(const(char)[] name)
+   {
+      if (allDigits(name))
+      {
+         auto idx = to!int(name);
+         
+         if (idx < this.args.length)
+         {
+            return this.args[idx];
+         }
+         else
+         {
+            return "";
+         }
+      }
+      else
+      {
+         // Expand the names environment variable
+         auto p = (name in this.env);
+         if (p is null)
+         {
+            return "";
+         }
+         else
+         {
+            return *p;
+         }
+      }
+   }
+   
+   void setEnv(const(char)[] name, const(char)[] value)
+   {
+      if (allDigits(name))
+      {
+         auto idx = to!int(name);
+         
+         if (this.args.length < idx)
+         {
+            this.args.length = idx+1;
+         }
+         this.args[idx] = value.idup;
+      }
+      else
+      {
+         this.env[name] = value.idup;
+      }
+   }
+   
+   static pure bool allDigits(const(char)[] name)
+   {
+      foreach (const(char)ch; name)
+      {
+         if (!isDigit(ch))
+         {
+            return false;
+         }
+      }
+      
+      return true;
+   }
+   
    bool first;          // Is this the first line of input
    
    OutBuffer      out_buf;
@@ -1127,6 +1519,7 @@ public class Ish
    File           sub_fp; // Sub-shell input
    Pid            sub_pid;
    string[string] env;
+   string[]       args;
    string         cwd;
    int            exitStatus = 0;
    int            lineNo  = 1;

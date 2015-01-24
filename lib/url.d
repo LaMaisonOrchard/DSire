@@ -109,7 +109,6 @@ export class UrlException : Exception
     ];
 }
 
-
 /**
  Decode the constituent parts of the URL. See RFC3986 January 2005
  */
@@ -135,14 +134,32 @@ export struct Url
 
     @property
     {
-        string scheme()   const {return _scheme;}
-        string userInfo() const {return _user_info;}
-        string host()     const {return _host;}
-        Host   hostType() const {return _type;}
-        string port()     const {return _port;}
-        string path()     const {return _path;}
-        string query()    const {return _query;}
-        string fragment() const {return _fragment;}
+         string scheme()   const {return _scheme;}
+         string userInfo() const {return _user_info;}
+         string host()     const {return _host;}
+         Host   hostType() const {return _type;}
+         string port()     const {return _port;}
+         string path()     const {return _path;}
+         string query()    const {return _query;}
+         string fragment() const {return _fragment;}
+        
+         /**
+         Expand the URL to a full URL description.
+         */
+         string url()  // TODO
+         {
+            string rtn;
+            
+            auto scheme = _scheme;
+            if (scheme != "file")
+            {
+               rtn = scheme ~ ":";
+            }
+            
+            rtn ~= _path;
+            
+            return rtn;
+         }
     }      
         
     /**
@@ -736,9 +753,10 @@ export struct Url
         _fragment   = fragment.idup;
     }
 
+    
     /**
      Break the path down into segment. If the path is relative
-     then it will extend 'contest'. All '', '.' and '..' segments
+     then it will extend 'context'. All '', '.' and '..' segments
      that can be resolved will be removed.
      */
     string[] Segments(string[] context = (string[]).init) const 
