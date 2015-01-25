@@ -1,7 +1,8 @@
+echo Make the bin directory to put then in
 mkdir bin
 
 echo Building ISH ....
 dmd${EXE} ishmain.d lib/ish.d lib/git.d lib/url.d -ofbin/ish
 
 echo Building SIRE ....
-dmd${EXE} sire.d    lib/ish.d lib/git.d  lib/url.d -ofbin/sire
+dmd${EXE} sire.d    lib/ish.d lib/git.d lib/url.d -ofbin/sire

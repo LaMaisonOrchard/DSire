@@ -1144,6 +1144,15 @@ public class Ish
                   }
                   else if (isScript(fullPath))
                   {
+                     auto appName = fullPath;
+version ( Windows )
+{
+                     if ((fullPath.length > 4) && (fullPath[$-4..$] == ".bat"))
+                     {
+                        // Windows batch file
+                        appName = getFullPath("cmd.exe");
+                     }
+}
                      // Run the file as a script
                      File input;
     
@@ -1151,7 +1160,7 @@ public class Ish
                      scope(exit) input.close();
                      
                      string[] args;
-                     args ~= fullPath;
+                     args ~= appName;
                      foreach (const(char)[] arg; expanded[1..$]) args ~= arg.idup;
                      auto shell  = new Ish(this.err_fp, this.err_fp, this.env, this.cwd, args);
                      
@@ -1231,6 +1240,18 @@ version ( Windows )
 {
       immutable(char) psep = ';';
       
+      string[] varList =
+      [
+         "PROGRAMFILES",
+         "PROGRAMFILES(X86)",
+         "PROGRAMW6432",
+         "COMMONPROGRAMFILES",
+         "COMMONPROGRAMFILES(X86)",
+         "COMMONPROGRAMW6432",
+         "WINDIR",
+         "SystemRoot"
+      ];
+         
       // The directory from which the application loaded.
       tmp = thisExePath() ~ "/" ~ name;
       if (executableFile(tmp))
@@ -1245,119 +1266,20 @@ version ( Windows )
          return tmp;
       }
       
-      // The 32-bit Windows system directory.
-      tmp = getEnv("PROGRAMFILES");
-      if (tmp.length > 0)
+      foreach(envVar; varList)
       {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         tmp = getEnv(envVar);
+         if (tmp.length > 0)
          {
-            if (executableFile(tmp1))
+            foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
             {
-               return tmp;
+               if (executableFile(tmp1))
+               {
+                  return tmp;
+               }
             }
          }
       }
-      
-      tmp = getEnv("PROGRAMFILES(X86)");
-      if (tmp.length > 0)
-      {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
-         {
-            if (executableFile(tmp1))
-            {
-               return tmp;
-            }
-         }
-      }
-
-      tmp = getEnv("COMMONPROGRAMFILES");
-      if (tmp.length > 0)
-      {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
-         {
-            if (executableFile(tmp1))
-            {
-               return tmp;
-            }
-         }
-      }
-      
-      tmp = getEnv("COMMONPROGRAMFILES(X86)");
-      if (tmp.length > 0)
-      {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
-         {
-            if (executableFile(tmp1))
-            {
-               return tmp;
-            }
-         }
-      }
-      
-      // The 16-bit Windows system directory.
-      if (tmp.length > 0)
-      {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
-         {
-            if (executableFile(tmp1))
-            {
-               return tmp;
-            }
-         }
-      }
-
-      tmp = getEnv("COMMONPROGRAMW6432");
-      if (tmp.length > 0)
-      {
-         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
-         {
-            if (executableFile(tmp1))
-            {
-               return tmp;
-            }
-         }
-      }
-      
-      // The Windows directory.
-      tmp = getEnv("windir");
-      if (tmp.length > 0)
-      {
-         tmp = buildPath(tmp, name);
-         if (executableFile(tmp))
-         {
-            return tmp;
-         }
-      }
-      
-      tmp = getEnv("SystemRoot");
-      if (tmp.length > 0)
-      {
-         tmp = buildPath(tmp, name);
-         if (executableFile(tmp))
-         {
-            return tmp;
-         }
-      }
-      
-      tmp = getEnv("SystemRoot") ~ "/System32";
-      if (tmp.length > 0)
-      {
-         tmp = buildPath(tmp, name);
-         if (executableFile(tmp))
-         {
-            return tmp;
-         }
-      }
-      
-      tmp = getEnv("SystemRoot") ~ "/SysWOW64";
-      if (tmp.length > 0)
-      {
-         tmp = buildPath(tmp, name);
-         if (executableFile(tmp))
-         {
-            return tmp;
-         }
-      }      
 }
 else
 {
