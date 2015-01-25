@@ -1246,23 +1246,80 @@ version ( Windows )
       }
       
       // The 32-bit Windows system directory.
-      // TODO
-      
-      // The 16-bit Windows system directory.
-      // TODO
-      
-      // The Windows directory.
-      tmp = getEnv("windir");
+      tmp = getEnv("PROGRAMFILES");
       if (tmp.length > 0)
       {
-         tmp = buildPath(tmp, name);
-         if (executableFile(tmp))
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
          {
-            return tmp;
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
          }
       }
       
-      tmp = getEnv("Windir");
+      tmp = getEnv("PROGRAMFILES(X86)");
+      if (tmp.length > 0)
+      {
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         {
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
+         }
+      }
+
+      tmp = getEnv("COMMONPROGRAMFILES");
+      if (tmp.length > 0)
+      {
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         {
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
+         }
+      }
+      
+      tmp = getEnv("COMMONPROGRAMFILES(X86)");
+      if (tmp.length > 0)
+      {
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         {
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
+         }
+      }
+      
+      // The 16-bit Windows system directory.
+      if (tmp.length > 0)
+      {
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         {
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
+         }
+      }
+
+      tmp = getEnv("COMMONPROGRAMW6432");
+      if (tmp.length > 0)
+      {
+         foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+         {
+            if (executableFile(tmp1))
+            {
+               return tmp;
+            }
+         }
+      }
+      
+      // The Windows directory.
+      tmp = getEnv("windir");
       if (tmp.length > 0)
       {
          tmp = buildPath(tmp, name);
@@ -1374,7 +1431,8 @@ else
    
    static bool executableFile(const(char)[] name)
    {
-      return (exists(name) && isFile(name));
+      bool exe = (exists(name) && isFile(name));
+      return exe;
    }
    
     
@@ -1452,6 +1510,17 @@ else
    
    string getEnv(const(char)[] name)
    {
+version ( Windows )
+{
+      // Force the name to uppercase
+      char[] tmp;
+      tmp.length = name.length;
+      for (int i = 0; (i < name.length); i++)
+      {
+         tmp[i] = toUpper(name[i]);
+      }
+      name = tmp.idup;
+}
       if (allDigits(name))
       {
          auto idx = to!int(name);
@@ -1482,6 +1551,17 @@ else
    
    void setEnv(const(char)[] name, const(char)[] value)
    {
+version ( Windows )
+{
+      // Force the name to uppercase
+      char[] tmp;
+      tmp.length = name.length;
+      for (int i = 0; (i < name.length); i++)
+      {
+         tmp[i] = toUpper(name[i]);
+      }
+      name = tmp.idup;
+}
       if (allDigits(name))
       {
          auto idx = to!int(name);

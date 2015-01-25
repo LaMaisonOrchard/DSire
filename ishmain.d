@@ -14,8 +14,20 @@ int main(string args[])
       input.open(args[1], "r");
     }
     scope(exit) input.close();
+
+    auto env = environment.toAA();
+version ( Windows )
+{
+    env["EXE"] = ".exe";
+    env["BAT"] = ".bat";
+}
+else
+{
+    env["EXE"] = "";
+    env["BAT"] = "";
+}
     
-    auto shell = new Ish(stdout, stderr, environment.toAA(), getcwd(), args);
+    auto shell = new Ish(stdout, stderr, env, getcwd(), args);
     
     foreach (line; input.byLine())
     {

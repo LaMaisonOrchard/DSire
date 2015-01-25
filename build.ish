@@ -1,6 +1,7 @@
+mkdir bin
 
 echo Building ISH ....
-dmd ishmain.d lib/ish.d lib/git.d -ofish
+dmd${EXE} ishmain.d lib/ish.d lib/git.d lib/url.d -ofbin/ish
 
 echo Building SIRE ....
-dmd sire.d    lib/ish.d lib/git.d -ofsire
+dmd${EXE} sire.d    lib/ish.d lib/git.d  lib/url.d -ofbin/sire
