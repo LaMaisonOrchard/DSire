@@ -47,8 +47,7 @@ public class Ish
       // Is there a sub-shell
       if (sub_fp.isOpen())
       {
-         sub_fp.close();
-         this.exitStatus = wait(this.sub_pid);
+         this.exitStatus = finishSubShell();
       }
       
       return this.exitStatus;
@@ -64,7 +63,6 @@ public class Ish
    {
       auto parseState = state.SPACE;
       
-      char[]    entry;
       Element[] line;
       bool      more    = true;
       bool      lineEnd = false;  // Are we at the end of a line
@@ -94,18 +92,19 @@ public class Ish
          this.sub_fp.writeln(input);
          input = input[0..0];
          
-         auto rtn = tryWait(this.sub_pid);
-         if (rtn.terminated)
-         {
-            sub_fp.close();
-            more            = false;
-            this.exitStatus = rtn.status;
-         }
+         //auto rtn = tryWait(this.sub_pid);
+         //if (rtn.terminated)
+         //{
+         //   sub_fp.close();
+         //   more            = false;
+         //   this.exitStatus = rtn.status;
+         //}
       }
       
-      while (more && (input.length > 0))
+      int i = 0;
+      while (more && (i < input.length))
       {
-         if (input[0] == '\r')
+         if (input[i] == '\r')
          {
             // EOL
             if (parseState == state.DOUBLE_QUOTE)
@@ -120,13 +119,13 @@ public class Ish
             }
             else
             {
-               more = eol(parseState, line, entry);
+               more = eol(parseState, line, input[0..i]);
             }
             
-            entry = entry[0..0];
+            input = input[i+1..$]; i = 0;
             line  = line [0..0];
             
-            if ((input.length > 1) && (input[1] == '\n'))
+            if ((input.length > 1) && (input[i] == '\n'))
             {
                // Consume the '\r' so the '\n' is also consumed
                input = input[1..$];
@@ -135,7 +134,7 @@ public class Ish
             lineNo  += 1;
             lineEnd  = true;
          }
-         else if (input[0] == '\n')
+         else if (input[i] == '\n')
          {
             // EOL
             if (parseState == state.DOUBLE_QUOTE)
@@ -150,10 +149,10 @@ public class Ish
             }
             else
             {
-               more = eol(parseState, line, entry);
+               more = eol(parseState, line, input[0..i]);
             }
             
-            entry = entry[0..0];
+            input = input[i+1..$]; i = 0;
             line  = line [0..0];
             
             lineNo  += 1;
@@ -166,103 +165,85 @@ public class Ish
             switch (parseState)
             {
                case state.SPACE: // white space
-                  if (isWhite(input[0]))
+                  if (isWhite(input[i]))
                   {
                      // Consume the white space
+                     i += 1;
                   }
-                  else if (input[0] == '\"')
+                  else if (input[i] == '\"')
                   {
                      // Consume the start quote
+                     input = input[i+1..$]; i = 0;
                      parseState = state.DOUBLE_QUOTE;
                   }
-                  else if (input[0] == '`')
+                  else if (input[i] == '`')
                   {
                      // Consume the start quote
+                     input = input[i+1..$]; i = 0;
                      parseState = state.BACK_QUOTE;
                   }
-                  else if (input[0] == ';')
+                  else if (input[i] == ';')
                   {
                      // EOL
-                     more = eol(parseState, line, entry);
-                     entry = entry[0..0];
+                     more = eol(parseState, line, "");
+                     input = input[i+1..$]; i = 0;
                      line  = line [0..0];
                   }
-                  else if (input[0] == '\\')
+                  else if (input[i] == escCh)
                   {
-                     if (input.length < 2)
+                     if (input.length < i+2)
                      {
                         // Illegal escape sequence
                      }
                      else
                      {
-                        // Consume the escape
-                        input = input[1..$];
-                     
-                        // Add to the entry
-                        switch(input[0])
-                        {
-                           case 'n':
-                              entry ~= '\n';
-                              break;
-                           
-                           case 'r':
-                              entry ~= '\r';
-                              break;
-                           
-                           case 't':
-                              entry ~= '\t';
-                              break;
-                           
-                           default:
-                              entry ~= input[0];
-                              break;
-                        }
+                        input = input[i..$]; i = 2;
                         parseState  = state.ARG;		
                      }
                   }
                   else
                   {
                      // Add to the entry
-                      entry ~= input[0];
-                     
+                     input = input[i..$]; i = 1;
                      parseState  = state.ARG;
                   }
                   break;
                   
                case state.ARG: // argument
-                  if (isWhite(input[0]))
+                  if (isWhite(input[i]))
                   {
                      // End of the entry
-                     line ~= Element(this, parseState, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i..$]; i = 1;
                      parseState = state.SPACE;
                   }
-                  else if (input[0] == '\"')
+                  else if (input[i] == '\"')
                   {
                      // End of the entry
-                     line ~= Element(this, parseState, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i..$]; i = 1;
                      
                      // Consume the start quote
                      parseState = state.DOUBLE_QUOTE;
                   }
-                  else if (input[0] == '`')
+                  else if (input[i] == '`')
                   {
                      // End of the entry
-                     line ~= Element(this, parseState, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i..$]; i = 1;
                      
                      // Consume the start quote
                      parseState = state.BACK_QUOTE;
                   }
-                  else if (input[0] == ';')
+                  else if (input[i] == ';')
                   {
                      // EOL
-                     more = eol(parseState, line, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i+1..$]; i = 0;
                      line  = line [0..0];
+                     parseState = state.SPACE;
                   }
-                  else if (input[0] == '\\')
+                  else if (input[i] == escCh)
                   {
                      if (input.length < 2)
                      {
@@ -271,47 +252,27 @@ public class Ish
                      else
                      {
                         // Consume the escape
-                        input = input[1..$];
-                     
-                        // Add to the entry
-                        switch(input[0])
-                        {
-                           case 'n':
-                           entry ~= '\n';
-                           break;
-                           
-                           case 'r':
-                           entry ~= '\r';
-                           break;
-                           
-                           case 't':
-                           entry ~= '\t';
-                           break;
-                           
-                           default:
-                           entry ~= input[0];
-                           break;
-                        }		
+                        i += 2;
                      }
                   }
                   else
                   {
                      // Add to the entry
-                     entry ~= input[0];
+                     i += 1;
                   }
                   break;
                   
                case state.DOUBLE_QUOTE: // quote
-                  if (input[0] == '\"')
+                  if (input[i] == '\"')
                   {
                      // End of the entry
-                     line ~= Element(this, parseState, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i..$]; i = 1;
                      
                      // Consume the end quote
                      parseState = state.SPACE;
                   }
-                  else if (input[0] == '\\')
+                  else if (input[i] == escCh)
                   {
                      if (input.length < 2)
                      {
@@ -320,42 +281,22 @@ public class Ish
                      else
                      {
                         // Consume the escape
-                        input = input[1..$];
-                     
-                        // Add to the entry
-                        switch(input[0])
-                        {
-                           case 'n':
-                           entry ~= '\n';
-                           break;
-                           
-                           case 'r':
-                           entry ~= '\r';
-                           break;
-                           
-                           case 't':
-                           entry ~= '\t';
-                           break;
-                           
-                           default:
-                           entry ~= input[0];
-                           break;
-                        }		
+                        i += 2;
                      }
                   }
                   else
                   {
                      // Add to the entry
-                     entry ~= input[0];
+                     i += 1;
                   }
                   break;
                   
                case state.BACK_QUOTE: // operation
-                  if (input[0] == '`')
+                  if (input[i] == '`')
                   {
                      // End of the entry
-                     line ~= Element(this, parseState, entry);
-                     entry = entry[0..0];
+                     line ~= Element(this, parseState, input[0..i]);
+                     input = input[i..$]; i = 1;
                      
                      // Consume the end quote
                      parseState = state.SPACE;
@@ -363,7 +304,7 @@ public class Ish
                   else
                   {
                      // Add to the entry
-                     entry ~= input[0];
+                     i += 1;
                   }
                   break;
                   
@@ -372,9 +313,6 @@ public class Ish
                   break;
             }
          }
-         
-         // Remove the charactor that has now been processed
-         input = input[1..$];
       }
       
       
@@ -392,10 +330,10 @@ public class Ish
       }
       else
       {
-         more = eol(parseState, line, entry);
+         more = eol(parseState, line, input[0..i]);
       }
       
-      entry = entry[0..0];
+      input = input[0..0];
       line  = line [0..0];
       
       if (!lineEnd)
@@ -458,13 +396,22 @@ public class Ish
       // This must start with an absolute path
       if (((name.scheme  == "file") || (name.scheme.length == 1)) && (name.path[0] == '/'))
       {
-         
          try
          {
-            auto pipes = pipeProcess(args, Redirect.stdin, this.env, Config.newEnv | Config.suppressConsole, cwd);
-            this.sub_pid = pipes.pid;
-            this.sub_fp  = pipes.stdin;
+            auto tmpFile = tempFile();
+            this.sub_fp.open(tmpFile, "w");
             
+            this.sub_shell = this.sub_shell[0..0];
+            foreach(arg; args)
+            {
+               this.sub_shell ~= arg.idup;
+            }
+            this.sub_shell ~= tmpFile;
+            
+         //   auto pipes = pipeProcess(args, Redirect.stdin, this.env, Config.newEnv | Config.suppressConsole, cwd);
+         //   this.sub_pid = pipes.pid;
+         //   this.sub_fp  = pipes.stdin;
+         //  
             // Pass through any remaining input
             if (input.length > 0)
             {
@@ -482,11 +429,25 @@ public class Ish
       else
       {
          more = false;
-         err_fp.writeln("Illegal sub-shell");
+         err_fp.write  ("Illegal sub-shell : "); 
+         err_fp.writeln(name);
          exitStatus = -1;
       }
       
       return more;
+   }
+   
+   /////////////////////////////////////////////////////
+   //
+   // Start a sub shell using the given command
+   //
+   int finishSubShell()
+   {
+      this.sub_fp.close();
+      
+      auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
+      
+      return wait(pid);
    }
    
    /////////////////////////////////////////////////////
@@ -549,18 +510,25 @@ public class Ish
       //
       // RETURN False is returned in the shell exits
       //
-      const(char)[][] expand()
+      string[] expand()
       {
          switch(type)
          {
             default:
                return [""];  // Should never get here
                
-            case state.ARG:      
-               return [expandVariables(this.arg)];  // These need to be re-parsed TODO
-               
-            case state.DOUBLE_QUOTE:      
-               return [expandVariables(this.arg)];
+            case state.ARG:     
+            case state.DOUBLE_QUOTE:   
+               auto name = expandVariables(this.arg).idup;
+               auto list = glob(name);
+               if (list.length == 0)
+               {
+                  return [decode(name)];
+               }
+               else
+               {
+                  return list;
+               }
                
             case state.BACK_QUOTE: 
                auto output = new OutBuffer();
@@ -569,7 +537,7 @@ public class Ish
                shell.run(this.arg);
                auto text = output.toString();
                
-               const(char)[][] args;
+               string[] args;
                int s = 0;
                int e = 0;
                while (e < text.length)
@@ -579,27 +547,27 @@ public class Ish
                   
                   if (e >= text.length)
                   {
-                  // The end
+                     // The end
                   }
                   else if (text[e] == '\"')
                   {
-                  // Quoted argument
-                  e++;
-                  s = e;
-                  while ((e < text.length) && (text[e] != '\"')) e++;
-                  
-                  args ~= text[s..e];
+                     // Quoted argument
+                     e++;
+                     s = e;
+                     while ((e < text.length) && (text[e] != '\"')) e++;
+                     
+                     args ~= text[s..e].idup;
                   }
                   else
                   {
-                  // Unquoted argument
-                  s = e;
-                  while ((e < text.length) && !isWhite(text[e])) e++;
-                  
-                  if (s != e)
-                  {
-                     args ~= text[s..e];
-                  }
+                     // Unquoted argument
+                     s = e;
+                     while ((e < text.length) && !isWhite(text[e])) e++;
+                     
+                     if (s != e)
+                     {
+                        args ~= text[s..e].idup;
+                     }
                   }
                }
                return args;
@@ -614,7 +582,11 @@ public class Ish
          int    s = i;
          while (i < arg.length)
          {	
-            if (arg[i] != '$')
+            if (arg[i] == escCh)
+            {
+               i += 2;
+            }
+            else if (arg[i] != '$')
             {
                i += 1;
             }
@@ -741,6 +713,118 @@ public class Ish
          }
          
          return parent.getEnv(nm);
+      }
+   
+      string decode(string name)
+      {
+         string dec;
+         
+         int i = 0;
+         // Expand any excaped charactors and check for glob charactors
+         while (name.length > 0)
+         {            
+            if (name[0] == escCh)
+            {
+               // Excape
+               // TODO
+               name = name[1..$];
+               dec ~= name[i];
+            }
+            else
+            {
+               dec ~= name[0];
+            }
+            
+            name = name[1..$];
+         }
+         
+         return dec;
+      }
+   
+      string[] glob(string name, string path = "")
+      {
+         if (name.length == 0)
+         {
+            return [path];
+         }
+         else
+         {
+            string decode;
+            bool   doGlobe = false;
+            
+            int i = 0;
+            // Expand any excaped charactors and check for glob charactors
+            while (name.length > 0)
+            {
+               if ((name[0] =='*') || (name[0] =='?') || (name[0] =='[') || (name[0] ==']'))
+               {
+                  doGlobe = true;
+               }
+               
+               if (name[0] == escCh)
+               {
+                  // Excape
+                  // TODO
+                  name = name[1..$];
+                  decode ~= name[i];
+               }
+               else if ((name[0] == '/') || (name[0] == '\\'))
+               {
+                  if (!doGlobe)
+                  {
+                     path   ~= decode;
+                     path   ~= name[0];
+                     decode  = decode[0..0];
+                  }
+                  else
+                  {
+                     break;
+                  }
+               }
+               else
+               {
+                  decode ~= name[0];
+               }
+               
+               name = name[1..$];
+            }
+            
+            if (doGlobe)
+            {
+               string[] rtn;
+               string   tmp = path;
+               
+               if (path.length == 0)
+               {
+                  tmp = ".";
+               }
+             
+               try
+               {
+                  foreach (p; dirEntries(tmp, decode, SpanMode.shallow, true))
+                  {
+                     if (name.length == 0)
+                     {
+                        rtn ~= p.name;
+                     }
+                     else if (!isDir(p.name))
+                     {
+                     }
+                     else
+                     {
+                        rtn ~= glob(name[1..$], p.name ~ '/');
+                     }
+                  }
+               }
+               catch (FileException ex)
+               {
+               }
+               
+               return rtn;
+            }
+         }
+         
+         return [];
       }
       
       state  type;
@@ -1174,7 +1258,7 @@ version ( Windows )
                      
                      exitStatus = shell.ExitStatus();
                   }
-                  else
+                  else if (out_buf !is null)
                   {
                      // Use a pipe to capture stdout as text to be processed
                         
@@ -1187,6 +1271,13 @@ version ( Windows )
                      {
                         write(buffer);
                      }
+                  }
+                  else
+                  {
+                     char[] buffer;
+                     expanded[0] = fullPath;
+                     auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
+                     scope(exit) exitStatus = wait(pid);
                   }
                }
                catch(Exception ex)
@@ -1208,9 +1299,14 @@ version ( Windows )
    //
    // RETURN The full path
    //
-   public string getFullPath(string name)
+   static public string getFullPath(string name, string[string] env = null)
    {
       string tmp;
+      
+      if (env == null)
+      {
+         env = environment.toAA();
+      }
       
       // Check for an absolute path
       if (absolutePath(name))
@@ -1222,9 +1318,9 @@ version ( Windows )
       // Is the path specified
       foreach (ch; name)
       {
-         if (ch == '/')
+         if ((ch == '/') || (ch == '\\'))
          {
-            tmp = this.cwd ~ "/" ~ name;
+            tmp = getcwd() ~ "/" ~ name;
             if (executableFile(tmp))
             {
                return tmp;
@@ -1260,7 +1356,7 @@ version ( Windows )
       }
       
       // The current directory for the parent process.
-      tmp = this.cwd ~ "/" ~ name;
+      tmp = getcwd() ~ "/" ~ name;
       if (executableFile(tmp))
       {
          return tmp;
@@ -1268,7 +1364,7 @@ version ( Windows )
       
       foreach(envVar; varList)
       {
-         tmp = getEnv(envVar);
+         tmp = getEnv(envVar, env);
          if (tmp.length > 0)
          {
             foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
@@ -1288,7 +1384,7 @@ else
 }
 
       // The directories listed in the PATH environment variable.
-      auto path = getEnv("PATH");
+      auto path = .getEnv("PATH", env);
       
       int i = 0;
       while (i < path.length)
@@ -1329,7 +1425,7 @@ else
       return "";
    }
       
-   string buildPath(string path, string name)
+   static string buildPath(string path, string name)
    {
       if (absolutePath(path))
       {
@@ -1339,7 +1435,7 @@ else
       else
       {
          // Relative path
-         return this.cwd ~ "/" ~ path ~ "/" ~ name;
+         return getcwd() ~ "/" ~ path ~ "/" ~ name;
       }
    }
    
@@ -1430,99 +1526,157 @@ else
       return false;
    }
    
-   string getEnv(const(char)[] name)
+   private string getEnv(const(char)[] name)
    {
-version ( Windows )
-{
-      // Force the name to uppercase
-      char[] tmp;
-      tmp.length = name.length;
-      for (int i = 0; (i < name.length); i++)
-      {
-         tmp[i] = toUpper(name[i]);
-      }
-      name = tmp.idup;
-}
-      if (allDigits(name))
-      {
-         auto idx = to!int(name);
-         
-         if (idx < this.args.length)
-         {
-            return this.args[idx];
-         }
-         else
-         {
-            return "";
-         }
-      }
-      else
-      {
-         // Expand the names environment variable
-         auto p = (name in this.env);
-         if (p is null)
-         {
-            return "";
-         }
-         else
-         {
-            return *p;
-         }
-      }
+      return .getEnv(name, this.env, this.args);
    }
    
-   void setEnv(const(char)[] name, const(char)[] value)
+   private void setEnv(const(char)[] name, string value)
    {
-version ( Windows )
-{
-      // Force the name to uppercase
-      char[] tmp;
-      tmp.length = name.length;
-      for (int i = 0; (i < name.length); i++)
-      {
-         tmp[i] = toUpper(name[i]);
-      }
-      name = tmp.idup;
-}
-      if (allDigits(name))
-      {
-         auto idx = to!int(name);
-         
-         if (this.args.length < idx)
-         {
-            this.args.length = idx+1;
-         }
-         this.args[idx] = value.idup;
-      }
-      else
-      {
-         this.env[name] = value.idup;
-      }
-   }
-   
-   static pure bool allDigits(const(char)[] name)
-   {
-      foreach (const(char)ch; name)
-      {
-         if (!isDigit(ch))
-         {
-            return false;
-         }
-      }
-      
-      return true;
+      .setEnv(name, value, this.env, this.args);
    }
    
    bool first;          // Is this the first line of input
    
-   OutBuffer      out_buf;
-   File           out_fp;
-   File           err_fp;
-   File           sub_fp; // Sub-shell input
-   Pid            sub_pid;
-   string[string] env;
-   string[]       args;
-   string         cwd;
-   int            exitStatus = 0;
-   int            lineNo  = 1;
+   OutBuffer       out_buf;
+   File            out_fp;
+   File            err_fp;
+   File            sub_fp; // Sub-shell input
+   //Pid            sub_pid;
+   string[]        sub_shell;
+   string[string]  env;
+   string[]        args;
+   string          cwd;
+   int             exitStatus = 0;
+   int             lineNo  = 1;
+   
+   static immutable char escCh = '%';
+}
+
+
+
+
+///////// ENVIRONMENT Manipulation /////////////////////////////////////////////////////
+   
+public string getEnv(const(char)[] name, string[string] env, string[] args = null)
+{
+version ( Windows )
+{
+   // Force the name to uppercase
+   name = name.toUpper;
+}
+   if ((args != null) && allDigits(name))
+   {
+      auto idx = to!int(name);
+      
+      if (idx < args.length)
+      {
+         return args[idx];
+      }
+      else
+      {
+         return "";
+      }
+   }
+   else
+   {
+      // Expand the names environment variable
+      auto p = (name in env);
+      if (p is null)
+      {
+         return "";
+      }
+      else
+      {
+         return *p;
+      }
+   }
+}
+
+
+   
+public void setEnv(const(char)[] name, string value, ref string[string] env, ref string[] args)
+{
+version ( Windows )
+{
+   // Force the name to uppercase
+   name = name.toUpper;
+}
+   if ((args != null) && allDigits(name))
+   {
+      auto idx = to!int(name);
+      
+      if (args.length < idx)
+      {
+         args.length = idx+1;
+      }
+      args[idx] = value;
+   }
+   else
+   {
+      env[name] = value;
+   }
+}
+   
+public void setEnv(const(char)[] name, string value, ref string[string] env)
+{
+version ( Windows )
+{
+   // Force the name to uppercase
+   name = name.toUpper;
+}
+   env[name] = value.idup;
+}
+
+public void defaultEnv(const(char)[] name, string value, ref string[string] env)
+{
+version ( Windows )
+{
+   // Force the name to uppercase
+   name = name.toUpper;
+}
+
+   auto p = (name in env);
+   if (p is null)
+   {
+      // Undefined variable
+      env[name] = value;
+   }
+   else
+   {
+      // Already defined
+   }
+}
+
+@property public pure string toUpper(const(char)[] name)
+{
+   // TODO - this could be optimised
+   
+   // Force the name to uppercase
+   char[] tmp;
+   tmp.length = name.length;
+   for (int i = 0; (i < name.length); i++)
+   {
+      tmp[i] = std.ascii.toUpper(name[i]);
+   }
+   return tmp.idup;
+}
+
+public pure bool allDigits(const(char)[] name)
+{
+   foreach (const(char)ch; name)
+   {
+      if (!isDigit(ch))
+      {
+         return false;
+      }
+   }
+   
+   return true;
+}
+
+public string tempFile()
+{
+   // TODO
+   return tempDir() ~ "/fred";
 }
