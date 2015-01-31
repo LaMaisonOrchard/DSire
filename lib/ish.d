@@ -1347,7 +1347,7 @@ else
    static bool absolutePath(const(char)[] name)
    {
       Url tmp = name;
-      return ((tmp.scheme.length == 1) || (tmp.path[0] == '/'));
+      return ((tmp.path.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
    }
    
    
