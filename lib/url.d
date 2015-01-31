@@ -1,16 +1,24 @@
+/****************************************************************************
 
+    The Sire build utility 'sire'.
+    Copyright (C) 2015  David W Orchard (davido@errol.org.uk)
 
-/**
- Standard errors as definied by RFC2616 '6.1.1 Status Code and Reason Phrase',
- See also 'http://www.internetseer.com/help/error.xtp'.
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
- 1xx: Informational - Request received, continuing process
- 2xx: Success       - The action was successfully received, understood, and accepted
- 3xx: Redirection   - Further action must be taken in order to complete the request
- 4xx: Client Error  - The request contains bad syntax or cannot be fulfilled
- 5xx: Server Error  - The server failed to fulfill an apparently valid request
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
- */
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+*****************************************************************************/
+
 import std.string;
  
 export class UrlException : Exception
