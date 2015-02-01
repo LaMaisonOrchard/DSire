@@ -27,6 +27,7 @@ import std.conv;
 import std.outbuffer; 
 import std.file; 
 import std.datetime;
+import std.path;
 import url;
 
 
@@ -1322,6 +1323,14 @@ version ( Windows )
    static public string getFullPath(string name, string[string] env = null)
    {
       string tmp;
+version ( Windows )
+{
+      // If this does not have a suffix then add '.exe'
+      if (extension(name) == "")
+      {
+         name = name ~ ".exe";
+      }
+}
       
       if (env == null)
       {
@@ -1356,14 +1365,18 @@ version ( Windows )
 {
       immutable(char) psep = ';';
       
-      string[] varList =
+      string[] varList1 =
       [
          "PROGRAMFILES",
          "PROGRAMFILES(X86)",
          "PROGRAMW6432",
          "COMMONPROGRAMFILES",
          "COMMONPROGRAMFILES(X86)",
-         "COMMONPROGRAMW6432",
+         "COMMONPROGRAMW6432"
+      ];
+      
+      string[] varList2 =
+      [
          "WINDIR",
          "SystemRoot"
       ];
@@ -1382,16 +1395,31 @@ version ( Windows )
          return tmp;
       }
       
-      foreach(envVar; varList)
+      foreach(envVar; varList1)
       {
-         tmp = getEnv(envVar, env);
+         tmp = .getEnv(envVar, env);
          if (tmp.length > 0)
          {
             foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
             {
                if (executableFile(tmp1))
                {
-                  return tmp;
+                  return tmp1;
+               }
+            }
+         }
+      }
+      
+      foreach(envVar; varList2)
+      {
+         tmp = .getEnv(envVar, env);
+         if (tmp.length > 0)
+         {
+            foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
+            {
+               if (executableFile(tmp1))
+               {
+                  return tmp1;
                }
             }
          }
@@ -1463,7 +1491,7 @@ else
    static bool absolutePath(const(char)[] name)
    {
       Url tmp = name;
-      return ((tmp.scheme.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
+      return ((tmp.path.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
    }
    
    
@@ -1655,7 +1683,6 @@ version ( Windows )
    // Force the name to uppercase
    name = name.toUpper;
 }
-
    auto p = (name in env);
    if (p is null)
    {
