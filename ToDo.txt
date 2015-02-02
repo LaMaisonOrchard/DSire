@@ -21,6 +21,7 @@ solution.
    -- DONE
 
 5) wild card directory/file name expansion.
+   -- DONE
 
 6) 'git' command (stub then full)
 
@@ -28,6 +29,7 @@ solution.
    -- DONE
 
 8) Variable assignment
+   -- DONE
 
 9) If-then elif-else
 
@@ -55,11 +57,15 @@ solution.
 
 18) Identify and run scripts
    -- Started - needs to be completed
+   -- DONE
 
 18) Input/output redirection
     e.g. echo fred  > file      -- Create file with fred in it
     e.g. echo fred >> file      -- Append fred to the file
     e.g. doit.ish   < file      -- Input fron file
+
+11) # Comment syntax
+   -- DONE
 
 
 SIRE
