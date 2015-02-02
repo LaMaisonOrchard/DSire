@@ -210,6 +210,20 @@ public class Ish
                      input = input[i+1..$]; i = 0;
                      line  = line [0..0];
                   }
+                  else if (input[i] == '#')
+                  {
+                     // EOL
+                     more = eol(parseState, line, "");
+                     line  = line [0..0];
+
+                     // Skip to the end of line
+                     while ((input.length > i) && (input[i] != '\r') && (input[i] != '\n'))
+                     {
+                        i += 1;
+                     }
+                     input = input[i..$]; i = 0;
+                     
+                  }
                   else if (input[i] == escCh)
                   {
                      if (input.length < i+2)
@@ -259,10 +273,24 @@ public class Ish
                   else if (input[i] == ';')
                   {
                      // EOL
-                     line ~= Element(this, parseState, input[0..i]);
+                     more = eol(parseState, line, input[0..i]);
                      input = input[i+1..$]; i = 0;
                      line  = line [0..0];
                      parseState = state.SPACE;
+                  }
+                  else if (input[i] == '#')
+                  {
+                     // EOL
+                     more = eol(parseState, line, input[0..i]);
+                     line  = line [0..0];
+
+                     // Skip to the end of line
+                     while ((input.length > i) && (input[i] != '\r') && (input[i] != '\n'))
+                     {
+                        i += 1;
+                     }
+                     input = input[i..$]; i = 0;
+                     
                   }
                   else if (input[i] == escCh)
                   {
