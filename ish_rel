@@ -1,0 +1,61 @@
+
+
+SHELL = $(PWD)/bin/ish$(EXE) ;
+DMD = <dmd> ;
+GIT = <git> ;
+
+ORIGIN = "https://github.com/LaMaisonOrchard/DSire.git";
+BRANCH = master;
+
+DFLAGS = dw -g -m64 -O -op;
+
+TARGET | .git bin/ish bin/sire 
+{
+}
+
+
+
+// SIRE dependencies ////////////////////////////////////////////////
+
+*/sire$(EXE) | sire.d lib/ish.d lib/git.d lib/url.d
+{
+   mkdir $(1)
+   $(DMD) $(DEPS) -of$(TARGET)
+}
+
+
+// MSH dependencies ////////////////////////////////////////////////
+
+*/ish$(EXE) | ishmain.d lib/ish.d lib/git.d lib/url.d
+{
+   mkdir $(1)
+   $(DMD) $(DEPS) -of$(TARGET)
+}
+
+// GIT dependencies ////////////////////////////////////////////////
+.git | CREATE |
+{
+  rm relations
+  $(GIT) clone $(ORIGIN) -b $(BRANCH) .
+}
+
+pull |
+{
+  $(GIT) pull
+}
+
+push
+{
+  $(GIT) push
+}
+
+commit
+{
+  $(GIT) commit -a
+}
+
+amend
+{
+  $(GIT) commit --amend -a
+}
+
