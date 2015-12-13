@@ -921,7 +921,7 @@ public class Ish
             if (name[i] == '"')
             {
                // Quoted string
-               i == 1;
+               i += 1;
                int j = i;
                while ((name.length > i) && (name[i] != '"')) i += 1;
 
