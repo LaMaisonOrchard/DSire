@@ -27,6 +27,7 @@ import std.conv;
 import std.outbuffer; 
 import std.file; 
 import std.datetime;
+import std.path;
 import url;
 
 
@@ -202,12 +203,32 @@ public class Ish
                      input = input[i+1..$]; i = 0;
                      parseState = state.BACK_QUOTE;
                   }
+                  else if (input[i] == '=')
+                  {
+                     // EOL
+                     line  ~= Element(this, state.ARG, "=");
+                     input  = input[i+1..$]; i = 0;
+                  }
                   else if (input[i] == ';')
                   {
                      // EOL
                      more = eol(parseState, line, "");
                      input = input[i+1..$]; i = 0;
                      line  = line [0..0];
+                  }
+                  else if (input[i] == '#')
+                  {
+                     // EOL
+                     more = eol(parseState, line, "");
+                     line  = line [0..0];
+
+                     // Skip to the end of line
+                     while ((input.length > i) && (input[i] != '\r') && (input[i] != '\n'))
+                     {
+                        i += 1;
+                     }
+                     input = input[i..$]; i = 0;
+                     
                   }
                   else if (input[i] == escCh)
                   {
@@ -255,13 +276,34 @@ public class Ish
                      // Consume the start quote
                      parseState = state.BACK_QUOTE;
                   }
+                  else if (input[i] == '=')
+                  {
+                     // EOL
+                     line  ~= Element(this, parseState, input[0..i]);
+                     line  ~= Element(this, parseState, "=");
+                     input  = input[i+1..$]; i = 0;
+                  }
                   else if (input[i] == ';')
                   {
                      // EOL
-                     line ~= Element(this, parseState, input[0..i]);
+                     more = eol(parseState, line, input[0..i]);
                      input = input[i+1..$]; i = 0;
                      line  = line [0..0];
                      parseState = state.SPACE;
+                  }
+                  else if (input[i] == '#')
+                  {
+                     // EOL
+                     more = eol(parseState, line, input[0..i]);
+                     line  = line [0..0];
+
+                     // Skip to the end of line
+                     while ((input.length > i) && (input[i] != '\r') && (input[i] != '\n'))
+                     {
+                        i += 1;
+                     }
+                     input = input[i..$]; i = 0;
+                     
                   }
                   else if (input[i] == escCh)
                   {
@@ -537,7 +579,26 @@ public class Ish
             default:
                return [""];  // Should never get here
                
-            case state.ARG:     
+            case state.ARG:    
+               auto name  = expandVariables(this.arg).idup;
+               auto split = splitWhite(name);
+
+               string[] list;
+               foreach (n; split)
+               {
+                  auto exp = glob(n);
+                  if (exp.length == 0)
+                  {
+                     list ~= decode(n);
+                  }
+                  else
+                  {
+                     list ~= exp;
+                  }
+               }
+
+               return list;
+                  
             case state.DOUBLE_QUOTE:   
                auto name = expandVariables(this.arg).idup;
                auto list = glob(name);
@@ -846,6 +907,50 @@ public class Ish
          
          return [];
       }
+
+      string[] splitWhite(string name)
+      {
+         string[] rtn;
+
+         int i = 0;
+         while (name.length > i)
+         {
+            // Strip white space
+            while ((name.length > i) && isWhite(name[i])) i += 1;
+
+            if (name[i] == '"')
+            {
+               // Quoted string
+               i == 1;
+               int j = i;
+               while ((name.length > i) && (name[i] != '"')) i += 1;
+
+               rtn ~= name[j..i];
+
+               if (name[i] == '"') i += 1;
+            }
+            else
+            {
+               // Scan to the next white space
+               int j = i;
+               while ((name.length > i) && !isWhite(name[i]))
+               {
+                  if ((name[i] == escCh) && (name.length > i+1))
+                     i += 2;
+                  else
+                     i += 1;
+               }
+
+               // if we found something add it
+               if (i != j)
+               {
+                  rtn ~= name[j..i];
+               }
+            }
+         }
+
+         return rtn;
+      }
       
       state  type;
       string arg;
@@ -861,6 +966,7 @@ public class Ish
    private bool process(Element[] line)
    {
       bool more = true;
+      bool done = false;
       
       const(char)[][] expanded;
       
@@ -875,26 +981,77 @@ public class Ish
       {
          // The default is no error
          exitStatus = 0;
-                  
-         // Process the command
-         switch (expanded[0])
+
+         // Check for operators
+         if (expanded.length > 1)
          {
-            case "exit":
-               more = false;
-               if (expanded.length > 1)
-               {
-                  try
+            // Assume that this is an operator until we know better
+            done = true;
+
+            switch (expanded[1])
+            {
+               case "=":
+                  string value;	
+                  if (expanded.length > 2)
                   {
+                     if (containsSpaces(expanded[2]))
+                     {
+                        value ~= '\"';
+                        value ~= expanded[2];
+                        value ~= '\"';
+                     }
+                     else
+                     {
+                        value ~= expanded[2];
+                     }
+                  
+                     foreach(const(char)[] item; expanded[3..$])
+                     {
+                        value ~= " ";
+                        if (containsSpaces(item))
+                        {
+                           value ~= '\"';
+                           value ~= item;
+                           value ~= '\"';
+                        }
+                        else
+                        {
+                           value ~= item;
+                        }
+                     }
+                  }
+                  setEnv(expanded[0], value);
+                  break;
+
+               default:
+                  // This is not an operator - keep looking
+                  done = false;
+                  break;
+            }
+         }
+            
+         if (!done)
+         {      
+            // Process the command
+            done = true; // This will be processed one way or another
+            switch (expanded[0])
+            {
+               case "exit":
+                  more = false;
+                  if (expanded.length > 1)
+                  {
+                     try
+                     {
                      exitStatus = to!int(expanded[1]);
+                     }
+                     catch(Exception)
+                     {
+                        // Bad conversion
+                        err_fp.writeln("Bad argument to exit : ", expanded[1]);
+                        exitStatus = -1;
+                     }
                   }
-                  catch(Exception)
-                  {
-                     // Bad conversion
-                     err_fp.writeln("Bad argument to exit : ", expanded[1]);
-                     exitStatus = -1;
-                  }
-               }
-               break;
+                  break;
                
             case "echo":
                const(char)[][] items = expanded[1..$];
@@ -1308,6 +1465,7 @@ version ( Windows )
                }
                break;
          }
+         }
       }
       
       return more;
@@ -1322,6 +1480,14 @@ version ( Windows )
    static public string getFullPath(string name, string[string] env = null)
    {
       string tmp;
+version ( Windows )
+{
+      // If this does not have a suffix then add '.exe'
+      if (extension(name) == "")
+      {
+         name = name ~ ".exe";
+      }
+}
       
       if (env == null)
       {
@@ -1356,14 +1522,18 @@ version ( Windows )
 {
       immutable(char) psep = ';';
       
-      string[] varList =
+      string[] varList1 =
       [
          "PROGRAMFILES",
          "PROGRAMFILES(X86)",
          "PROGRAMW6432",
          "COMMONPROGRAMFILES",
          "COMMONPROGRAMFILES(X86)",
-         "COMMONPROGRAMW6432",
+         "COMMONPROGRAMW6432"
+      ];
+      
+      string[] varList2 =
+      [
          "WINDIR",
          "SystemRoot"
       ];
@@ -1382,16 +1552,31 @@ version ( Windows )
          return tmp;
       }
       
-      foreach(envVar; varList)
+      foreach(envVar; varList1)
       {
-         tmp = getEnv(envVar, env);
+         tmp = .getEnv(envVar, env);
          if (tmp.length > 0)
          {
             foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
             {
                if (executableFile(tmp1))
                {
-                  return tmp;
+                  return tmp1;
+               }
+            }
+         }
+      }
+      
+      foreach(envVar; varList2)
+      {
+         tmp = .getEnv(envVar, env);
+         if (tmp.length > 0)
+         {
+            foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
+            {
+               if (executableFile(tmp1))
+               {
+                  return tmp1;
                }
             }
          }
@@ -1463,7 +1648,7 @@ else
    static bool absolutePath(const(char)[] name)
    {
       Url tmp = name;
-      return ((tmp.scheme.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
+      return ((tmp.path.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
    }
    
    
@@ -1655,7 +1840,6 @@ version ( Windows )
    // Force the name to uppercase
    name = name.toUpper;
 }
-
    auto p = (name in env);
    if (p is null)
    {

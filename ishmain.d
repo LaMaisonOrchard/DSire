@@ -39,12 +39,14 @@ int main(string args[])
     
     auto shell = new Ish(stdout, stderr, env, getcwd(), args);
     
+    write("> ");
     foreach (line; input.byLine())
     {
-        if (!shell.run(line))
-        {
+      if (!shell.run(line))
+      {
 	  break;
 	}
+      write("> ");
     }
     
     return shell.ExitStatus();
