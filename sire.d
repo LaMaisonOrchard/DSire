@@ -23,11 +23,69 @@ import std.process;
 import std.file;
 import ish;
 
+string base = "";
+string script = "";
+string[] params;
+
 int main(string args[])
 {
+   string script;
+
+   auto env = setEnvironment(args[1..$]);
+
+   switch(appName(args[0]))
+   {
+       case "ish":
+          return ishMain(script, env);
+
+       case "sire":
+       default:
+          return sireMain(script, env);
+    }
+}
+
+string appName(string app)
+{
+   int i = app.length -1;
+   while ((i > 0) && (app[i] != '\\') && (app[i] != '/'))
+   {
+      i -= 1;
+   }
+
+   // Get the path to the app.
+   string name;
+   if (i >= 0)
+   {
+       base = app[0..i+1];
+       name = app[i+1..$];
+   }
+   else
+   {
+       base = "";
+       name = app;
+   }
+
+   // strip the suffix
+   i = name.length -1;
+   while ((i > 0) && (name[i] != '.'))
+   {
+      i -= 1;
+   }
+   if (i > 0)
+   {
+      // Remove the suffix found
+      name = name [0..i];
+   }
+
+   // Work out the absolute path - TODO}
+   writefln("APP [%s]  [%s]", base, name);
+
+   return name;
+}
+
+int sireMain(string script, string[string] env)
+{
    int status = 0;
-  
-   auto env = setEnvironment(args);
 
    // Display the environment
    foreach (string name, string value; env)
@@ -39,17 +97,48 @@ int main(string args[])
    return status;
 }
 
+int ishMain(string script, string[string] env)
+{
+    int status = 0;
+    
+    File input = stdin;
+    
+    if (script.length > 1)
+    {
+      input.open(script, "r");
+    }
+    scope(exit) input.close();
+    
+    auto shell = new Ish(stdout, stderr, env, getcwd(), params);
+    
+    write("> ");
+    foreach (line; input.byLine())
+    {
+      if (!shell.run(line))
+      {
+	  break;
+	}
+      write("> ");
+    }
+    
+    return shell.ExitStatus();
+}
 
-string[string] setEnvironment(ref string[] args)
+
+string[string] setEnvironment(string[] args)
 {
    auto env = environment.toAA();
   
    // Read and variable definitions
-   foreach (ref arg; args)
+   while (args.length > 0)
    {
+	string arg = args[0];
+      args = args[1..$];
+
       if (arg == "-params")
       {
          // everything else are shell parameters
+         params = args[1..$];
          break;
       }
       else if ((arg.length > 2) && (arg[0..2] == "-D"))
@@ -70,6 +159,15 @@ string[string] setEnvironment(ref string[] args)
          
          setEnv(name, value, env);
       }
+      else if (arg == "-f")
+      {
+         if (args.length > 0)
+         {
+             script = args[0];
+             args = args[1..$];
+         }
+      }
+
    }
 
 version( Win32 )
