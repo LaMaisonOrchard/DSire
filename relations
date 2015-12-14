@@ -17,7 +17,7 @@ TARGET | .git bin/ish bin/sire
 
 // SIRE dependencies ////////////////////////////////////////////////
 
-*/sire$(EXE) | sire.d lib/ish.d lib/git.d lib/url.d
+*/sire$(EXE) | sire.d env.d lib/ish.d lib/git.d lib/url.d
 {
    mkdir -p $(1)
    $(DMD) $(DEPS) -of$(TARGET)
@@ -26,10 +26,10 @@ TARGET | .git bin/ish bin/sire
 
 // MSH dependencies ////////////////////////////////////////////////
 
-*/ish$(EXE) | ishmain.d lib/ish.d lib/git.d lib/url.d
+*/ish$(EXE) | */sire$(EXE) 
 {
    mkdir -p $(1)
-   $(DMD) $(DEPS) -of$(TARGET)
+   cp $(DEPS) $(TARGET)
 }
 
 // GIT dependencies ////////////////////////////////////////////////

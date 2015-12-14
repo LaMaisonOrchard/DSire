@@ -22,73 +22,34 @@ import std.stdio;
 import std.process;
 import std.file;
 import ish;
-
-string base = "";
-string script = "";
-string[] params;
+import env;
 
 int main(string args[])
 {
    string script;
 
-   auto env = setEnvironment(args[1..$]);
+   auto env = setEnvironment(args[0..$]);
 
-   switch(appName(args[0]))
+   switch(AppName())
    {
        case "ish":
-          return ishMain(script, env);
+          return ishMain();
+
+       case "env":
+          return envMain();
 
        case "sire":
        default:
-          return sireMain(script, env);
+          return sireMain();
     }
 }
 
-string appName(string app)
-{
-   int i = app.length -1;
-   while ((i > 0) && (app[i] != '\\') && (app[i] != '/'))
-   {
-      i -= 1;
-   }
-
-   // Get the path to the app.
-   string name;
-   if (i >= 0)
-   {
-       base = app[0..i+1];
-       name = app[i+1..$];
-   }
-   else
-   {
-       base = "";
-       name = app;
-   }
-
-   // strip the suffix
-   i = name.length -1;
-   while ((i > 0) && (name[i] != '.'))
-   {
-      i -= 1;
-   }
-   if (i > 0)
-   {
-      // Remove the suffix found
-      name = name [0..i];
-   }
-
-   // Work out the absolute path - TODO}
-   writefln("APP [%s]  [%s]", base, name);
-
-   return name;
-}
-
-int sireMain(string script, string[string] env)
+int sireMain()
 {
    int status = 0;
 
    // Display the environment
-   foreach (string name, string value; env)
+   foreach (string name, string value; Env())
    {
       writefln("[%s] = [%s]", name, value);
    }
@@ -97,118 +58,67 @@ int sireMain(string script, string[string] env)
    return status;
 }
 
-int ishMain(string script, string[string] env)
+int envMain()
+{
+   int status = 0;
+
+   // Display the environment
+   foreach (string name, string value; Env())
+   {
+      writefln("%s=%s", name, value);
+   }
+
+
+   return status;
+}
+
+
+int ishMain()
 {
     int status = 0;
     
     File input = stdin;
     
-    if (script.length > 1)
+    if (Targets.length > 1)
     {
-      input.open(script, "r");
+        int rtn = 0;
+
+        foreach (target; Targets())
+        {
+           input.open(Targets[0], "r");
+    	     scope(exit) input.close();
+
+           auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
+    
+           write("> ");
+           foreach (line; input.byLine())
+           {
+               if (!shell.run(line))
+               {
+	             break;
+	         }
+               write("> ");
+           }
+    
+           rtn = shell.ExitStatus();
+        }
+
+        return rtn;
     }
-    scope(exit) input.close();
+    else
+    {    
+        auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
     
-    auto shell = new Ish(stdout, stderr, env, getcwd(), params);
-    
-    write("> ");
-    foreach (line; input.byLine())
-    {
-      if (!shell.run(line))
-      {
-	  break;
-	}
-      write("> ");
-    }
-    
-    return shell.ExitStatus();
-}
-
-
-string[string] setEnvironment(string[] args)
-{
-   auto env = environment.toAA();
-  
-   // Read and variable definitions
-   while (args.length > 0)
-   {
-	string arg = args[0];
-      args = args[1..$];
-
-      if (arg == "-params")
-      {
-         // everything else are shell parameters
-         params = args[1..$];
-         break;
-      }
-      else if ((arg.length > 2) && (arg[0..2] == "-D"))
-      {
-         string name  = arg[2..$];
-         string value = "1";
-         arg = "";
-         
-         for (int i = 0; (i < name.length); i++)
-         {
-            if (name[i] == '=')
+        write("> ");
+        foreach (line; input.byLine())
+        {
+            if (!shell.run(line))
             {
-               value = name[i+1..$];
-               name  = name[0..i];
-               break;
-            }
-         }
-         
-         setEnv(name, value, env);
-      }
-      else if (arg == "-f")
-      {
-         if (args.length > 0)
-         {
-             script = args[0];
-             args = args[1..$];
-         }
-      }
-
-   }
-
-version( Win32 )
-{
-   defaultEnv("OS",  "WIN32", env);
-   defaultEnv("EXE", ".exe", env);
-   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", env), env);
-}
-else version( Win64 )
-{
-   defaultEnv("OS",  "WIN64", env);
-   defaultEnv("EXE", ".exe", env);
-   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", env), env);
-}
-else version( linux )
-{
-   defaultEnv("OS",  "LINUX", env);
-   defaultEnv("EXE", "", env);
-   defaultEnv("EDITOR", Ish.getFullPath("nano", env), env);
-}
-else version( OSX )
-{
-   defaultEnv("OS",  "OSX", env);
-   defaultEnv("EXE", "", env);
-}
-else version ( FreeBSD )
-{
-   defaultEnv("OS",  "FREEBSD", env);
-   defaultEnv("EXE", "", env);
-}
-else version (Solaris)
-{
-   defaultEnv("OS",  "SOLARIS", env);
-   defaultEnv("EXE", "", env);
-}
-else
-{
-   static assert( false, "Unsupported platform" );
-}
-
-   defaultEnv("TMP", tempDir(), env);
-   
-   return env;
+	          break;
+	      }
+            write("> ");
+        }
+    
+        return shell.ExitStatus();
+    }
 }
