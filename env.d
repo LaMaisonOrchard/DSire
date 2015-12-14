@@ -19,6 +19,7 @@
 
 *****************************************************************************/
 import std.stdio;
+import core.stdc.stdlib;
 import std.process;
 import std.file;
 import ish;
@@ -46,11 +47,34 @@ string[string] setEnvironment(string[] args)
 	string arg = args[0];
       args = args[1..$];
 
-      if (arg == "-params")
+      if ((arg == "-params") || (arg == "-p"))
       {
          // everything else are shell parameters
-         params = args[1..$];
-         break;
+         params = args;
+         args = args[$..$];
+      }
+      else if (arg == "-c")
+      {
+         // everything else are shell parameters
+         if (args.length >0)
+         {
+            setEnv("CONFIG", args[0],   env);
+            args = args[1..$];
+         }
+      }
+      else if (arg == "-C")
+      {
+         // everything else are shell parameters
+         if (args.length >0)
+         {
+            chdir(args[0]);
+            args = args[1..$];
+         }
+      }
+      else if ((arg == "-i") || (arg == "-v") || (arg == "--version"))
+      {         
+         writefln("%s 0.0.1", AppName());
+         exit(0);
       }
       else if ((arg.length > 2) && (arg[0..2] == "-D"))
       {
@@ -70,10 +94,24 @@ string[string] setEnvironment(string[] args)
          
          setEnv(name, value, env);
       }
+      else if ((arg.length > 2) && (arg[0..2] == "-U"))
+      {
+         string name  = arg[2..$];
+         
+         for (int i = 0; (i < name.length); i++)
+         {
+            if (name[i] == '=')
+            {
+               name  = name[0..i];
+               break;
+            }
+         }
+         
+         unsetEnv(name, env);
+      }
       else if (arg[0] != '-')
       {
-         targets ~= args[0];
-         args = args[1..$];
+         targets ~= arg;
       }
 
    }
@@ -145,7 +183,6 @@ void GetAppName(string app)
    }
 
    // Get the path to the app.
-   string name;
    if (i >= 0)
    {
        base = app[0..i+1];
@@ -158,8 +195,8 @@ void GetAppName(string app)
    }
 
    // strip the suffix
-   i = name.length -1;
-   while ((i > 0) && (name[i] != '.'))
+   i = appName.length -1;
+   while ((i > 0) && (appName[i] != '.'))
    {
       i -= 1;
    }
@@ -168,6 +205,7 @@ void GetAppName(string app)
       // Remove the suffix found
       appName = appName [0..i];
    }
+
 
    // Work out the absolute path - TODO}
 }

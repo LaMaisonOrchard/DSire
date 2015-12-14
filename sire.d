@@ -54,6 +54,13 @@ int sireMain()
       writefln("[%s] = [%s]", name, value);
    }
 
+   // Display the environment
+   foreach (string name; Targets())
+   {
+      writefln("<%s>", name);
+   }
+
+
 
    return status;
 }

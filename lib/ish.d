@@ -1832,6 +1832,22 @@ version ( Windows )
 }
    env[name] = value.idup;
 }
+   
+public void unsetEnv(const(char)[] name, ref string[string] env)
+{
+version ( Windows )
+{
+   // Force the name to uppercase
+   name = name.toUpper;
+}
+   auto p = (name in env);
+   if (p !is null)
+   {
+      // We need a way of genuinly removing this from the array TODO
+   	env[name] = "";
+   }
+}
+
 
 public void defaultEnv(const(char)[] name, string value, ref string[string] env)
 {
