@@ -1844,7 +1844,7 @@ version ( Windows )
    if (p !is null)
    {
       // We need a way of genuinly removing this from the array TODO
-   	env[name] = "";
+   	env.remove(name.idup);
    }
 }
 

@@ -28,7 +28,7 @@ int main(string args[])
 {
    string script;
 
-   auto env = setEnvironment(args[0..$]);
+   setEnvironment(args[0..$]);
 
    switch(AppName())
    {

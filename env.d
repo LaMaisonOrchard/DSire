@@ -28,17 +28,16 @@ public
 {
 
 string         AppName() {return appName;}
-string         BaseDir() {return base;}
 string[]       Targets() {return targets;}
 string[]       Params()  {return params;}
 string[string] Env()     {return baseEnv;}
 
 
-string[string] setEnvironment(string[] args)
+void setEnvironment(string[] args)
 {
-   auto env = environment.toAA();
+   baseEnv = environment.toAA();
 
-   GetAppName(args[0]);
+   GetAppName();
    args = args[1..$];
   
    // Read and variable definitions
@@ -58,7 +57,7 @@ string[string] setEnvironment(string[] args)
          // everything else are shell parameters
          if (args.length >0)
          {
-            setEnv("CONFIG", args[0],   env);
+            setEnv("CONFIG", args[0], baseEnv);
             args = args[1..$];
          }
       }
@@ -92,7 +91,7 @@ string[string] setEnvironment(string[] args)
             }
          }
          
-         setEnv(name, value, env);
+         setEnv(name, value, baseEnv);
       }
       else if ((arg.length > 2) && (arg[0..2] == "-U"))
       {
@@ -107,7 +106,7 @@ string[string] setEnvironment(string[] args)
             }
          }
          
-         unsetEnv(name, env);
+         unsetEnv(name, baseEnv);
       }
       else if (arg[0] != '-')
       {
@@ -118,49 +117,45 @@ string[string] setEnvironment(string[] args)
 
 version( Win32 )
 {
-   defaultEnv("OS",  "WIN32", env);
-   defaultEnv("EXE", ".exe", env);
-   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", env), env);
+   defaultEnv("OS",  "WIN32", baseEnv);
+   defaultEnv("EXE", ".exe", baseEnv);
+   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
 }
 else version( Win64 )
 {
-   defaultEnv("OS",  "WIN64", env);
-   defaultEnv("EXE", ".exe", env);
-   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", env), env);
+   defaultEnv("OS",  "WIN64", baseEnv);
+   defaultEnv("EXE", ".exe", baseEnv);
+   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
 }
 else version( linux )
 {
-   defaultEnv("OS",  "LINUX", env);
-   defaultEnv("EXE", "", env);
-   defaultEnv("EDITOR", Ish.getFullPath("nano", env), env);
+   defaultEnv("OS",  "LINUX", baseEnv);
+   defaultEnv("EXE", "", baseEnv);
+   defaultEnv("EDITOR", Ish.getFullPath("nano", baseEnv), baseEnv);
 }
 else version( OSX )
 {
-   defaultEnv("OS",  "OSX", env);
-   defaultEnv("EXE", "", env);
+   defaultEnv("OS",  "OSX", baseEnv);
+   defaultEnv("EXE", "", baseEnv);
 }
 else version ( FreeBSD )
 {
-   defaultEnv("OS",  "FREEBSD", env);
-   defaultEnv("EXE", "", env);
+   defaultEnv("OS",  "FREEBSD", baseEnv);
+   defaultEnv("EXE", "", baseEnv);
 }
 else version (Solaris)
 {
-   defaultEnv("OS",  "SOLARIS", env);
-   defaultEnv("EXE", "", env);
+   defaultEnv("OS",  "SOLARIS", baseEnv);
+   defaultEnv("EXE", "", baseEnv);
 }
 else
 {
    static assert( false, "Unsupported platform" );
 }
 
-   defaultEnv("TMP",    tempDir(), env);
-   defaultEnv("PWD",    getcwd(),  env);
-   defaultEnv("CONFIG", "DEBUG",   env);
-
-   baseEnv = env;
-   
-   return env;
+   defaultEnv("TMP",    tempDir(), baseEnv);
+   defaultEnv("PWD",    getcwd(),  baseEnv);
+   defaultEnv("CONFIG", "DEBUG",   baseEnv);
 }
 
 }
@@ -170,12 +165,13 @@ private
 
 string[string] baseEnv;
 string         appName = "sire";
-string         base = "";
 string[]       targets;
 string[]       params;
 
-void GetAppName(string app)
+void GetAppName()
 {
+   string app = thisExePath();
+
    int i = app.length -1;
    while ((i > 0) && (app[i] != '\\') && (app[i] != '/'))
    {
@@ -185,12 +181,16 @@ void GetAppName(string app)
    // Get the path to the app.
    if (i >= 0)
    {
-       base = app[0..i+1];
        appName = app[i+1..$];
+       setEnv("DHUT_BIN", app[0..i+1], baseEnv);
+
+       if ((i > 4) && (app[i-4..i] == "/bin") || (app[i-4..i] == "\\bin"))
+       {
+           setEnv("DHUT", app[0..i-3], baseEnv);
+       }
    }
    else
    {
-       base = "";
        appName = app;
    }
 
@@ -205,9 +205,6 @@ void GetAppName(string app)
       // Remove the suffix found
       appName = appName [0..i];
    }
-
-
-   // Work out the absolute path - TODO}
 }
 
 }
