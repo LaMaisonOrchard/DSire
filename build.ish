@@ -2,7 +2,7 @@ echo Make the bin directory to put then in
 mkdir bin
 
 echo Building SIRE ....
-dmd${EXE} sire.d    lib/ish.d lib/git.d lib/url.d -ofbin/sire
+dmd${EXE} sire.d    lib/ish.d lib/git.d lib/url.d lib/rules.d -ofbin/sire
 
 echo Building ISH ....
 cp bin/sire${EXE} bin/ish${EXE}
