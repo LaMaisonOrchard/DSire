@@ -175,7 +175,7 @@ void GetAppName()
 {
    string app = thisExePath();
 
-   int i = app.length -1;
+   size_t i = app.length -1;
    while ((i > 0) && (app[i] != '\\') && (app[i] != '/'))
    {
       i -= 1;

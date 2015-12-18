@@ -235,7 +235,7 @@ string Concatinate(char ch, string[] list)
       work.length = list[0].length;
       work[0..$] = list[0][0..$];
 
-      int idx = work.length;
+      size_t idx = work.length;
       foreach (item; list)
       {
          work.length += item.length +1;

@@ -9,7 +9,7 @@ dmd -c -op lib/ish.d
 dmd -c -op lib/git.d 
 dmd -c -op lib/url.d 
 dmd -c -op lib/rules.d 
-dmd -c -op lib/lineProcessing.d
+dmd -c -op lib/LineProcessing.d
 dmd -c -op lib/env.d
 dmd -c sire.obj appEnv.obj lib/ish.obj lib/git.obj lib/url.obj lib/rules.obj lib/lineProcessing.obj lib/env.obj -ofbin\sire.exe
 

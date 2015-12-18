@@ -182,8 +182,8 @@ public pure string[] Decode(string line)
 {
    string[] args;
 
-   int start = 0;
-   int end = 0;
+   size_t start = 0;
+   size_t end = 0;
 
    while (end < line.length)
    {
