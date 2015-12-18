@@ -21,8 +21,8 @@
 import std.stdio;
 import std.process;
 import std.file;
-import ish;
-import env;
+import lib.ish;
+import appEnv;
 
 int main(string args[])
 {

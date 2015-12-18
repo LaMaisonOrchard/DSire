@@ -22,7 +22,8 @@ import std.stdio;
 import core.stdc.stdlib;
 import std.process;
 import std.file;
-import ish;
+import lib.ish;
+import lib.env;
 
 public
 {
@@ -36,6 +37,8 @@ string[string] Env()     {return baseEnv;}
 void setEnvironment(string[] args)
 {
    baseEnv = environment.toAA();
+   setEnv(environment.toAA());
+
 
    GetAppName();
    args = args[1..$];
