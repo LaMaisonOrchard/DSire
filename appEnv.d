@@ -122,33 +122,39 @@ version( Win32 )
 {
    defaultEnv("OS",  "WIN32", baseEnv);
    defaultEnv("EXE", ".exe", baseEnv);
+   defaultEnv("OBJ", ".obj", baseEnv);
    defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
 }
 else version( Win64 )
 {
    defaultEnv("OS",  "WIN64", baseEnv);
    defaultEnv("EXE", ".exe", baseEnv);
+   defaultEnv("OBJ", ".obj", baseEnv);
    defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
 }
 else version( linux )
 {
    defaultEnv("OS",  "LINUX", baseEnv);
    defaultEnv("EXE", "", baseEnv);
+   defaultEnv("OBJ", ".o", baseEnv);
    defaultEnv("EDITOR", Ish.getFullPath("nano", baseEnv), baseEnv);
 }
 else version( OSX )
 {
    defaultEnv("OS",  "OSX", baseEnv);
+   defaultEnv("OBJ", ".o", baseEnv);
    defaultEnv("EXE", "", baseEnv);
 }
 else version ( FreeBSD )
 {
    defaultEnv("OS",  "FREEBSD", baseEnv);
+   defaultEnv("OBJ", ".o", baseEnv);
    defaultEnv("EXE", "", baseEnv);
 }
 else version (Solaris)
 {
    defaultEnv("OS",  "SOLARIS", baseEnv);
+   defaultEnv("OBJ", ".o", baseEnv);
    defaultEnv("EXE", "", baseEnv);
 }
 else
