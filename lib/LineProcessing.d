@@ -251,6 +251,9 @@ public pure string Encode(string[] args ...)
  **/
 public pure string NormalisePath(string path)
 {
+version ( Windows )
+{
+
    //Check for character to convert
    int count = 0;
    foreach (ch ; path)
@@ -286,6 +289,11 @@ public pure string NormalisePath(string path)
 
       return work.idup;
    }
+}
+else
+{
+   return path;
+}
 }
 
 
