@@ -114,14 +114,14 @@ int ishMain()
     {    
         auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
     
-        //write("> ");
+        if (interactive) write("> ");
         foreach (line; input.byLine())
         {
             if (!shell.run(line))
             {
 	          break;
 	      }
-            //write("> ");
+            if (interactive) write("> ");
         }
     
         return shell.ExitStatus();
