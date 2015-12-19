@@ -1,3 +1,4 @@
+#!/Projects/DSire/bin/ish.exe -ni
 
 echo fred bill "a  b"
 ls *.d

@@ -86,7 +86,7 @@ int ishMain()
     
     File input = stdin;
     
-    if (Targets.length > 1)
+    if (Targets.length > 0)
     {
         int rtn = 0;
 
@@ -97,14 +97,12 @@ int ishMain()
 
            auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
     
-           write("> ");
            foreach (line; input.byLine())
            {
                if (!shell.run(line))
                {
 	             break;
 	         }
-               write("> ");
            }
     
            rtn = shell.ExitStatus();
@@ -116,14 +114,14 @@ int ishMain()
     {    
         auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
     
-        write("> ");
+        //write("> ");
         foreach (line; input.byLine())
         {
             if (!shell.run(line))
             {
 	          break;
 	      }
-            write("> ");
+            //write("> ");
         }
     
         return shell.ExitStatus();

@@ -91,11 +91,9 @@ public class Ish
       // Is this the first input line
       if (this.first)
       {
-         first = false;
-         
+         first = false;         
          if (input.length > 2)
-         {
-            // Does the line start with a hash bang
+         {            // Does the line start with a hash bang
             if ((input[0] == '#') &&
                 (input[1] == '!'))
             {
@@ -112,14 +110,20 @@ public class Ish
          // Send the input to the sub-shell
          this.sub_fp.writeln(input);
          input = input[0..0];
-         
-         //auto rtn = tryWait(this.sub_pid);
-         //if (rtn.terminated)
+
+         // This blocks - we need a way of doing non-blocking - TODO
+         //foreach (text; this.sub_out.byLine())
          //{
-         //   sub_fp.close();
-         //   more            = false;
-         //   this.exitStatus = rtn.status;
+         //    out_fp.writeln(text);
          //}
+         
+         auto rtn = tryWait(this.sub_pid);
+         if (rtn.terminated)
+         {
+            sub_fp.close();
+            more            = false;
+            this.exitStatus = rtn.status;
+         }
       }
       
       int i = 0;
@@ -427,7 +431,7 @@ public class Ish
          input = input[i..$];
          
          // Remove any white space
-         while ((input.length > 0) && isWhite(input[i]))
+         while ((input.length > 0) && isWhite(input[0]))
          {
             if (input[0] == '\r')
             {
@@ -460,24 +464,22 @@ public class Ish
       {
          try
          {
-            auto tmpFile = tempFile();
-            this.sub_fp.open(tmpFile, "w");
-            
             this.sub_shell = this.sub_shell[0..0];
             foreach(arg; args)
             {
                this.sub_shell ~= arg.idup;
             }
-            this.sub_shell ~= tmpFile;
             
-         //   auto pipes = pipeProcess(args, Redirect.stdin, this.env, Config.newEnv | Config.suppressConsole, cwd);
-         //   this.sub_pid = pipes.pid;
-         //   this.sub_fp  = pipes.stdin;
-         //  
+            auto pipes = pipeProcess(args, Redirect.stdin | Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+            this.sub_pid = pipes.pid;
+            this.sub_fp  = pipes.stdin;
+            this.sub_out = pipes.stdout;
+           
             // Pass through any remaining input
             if (input.length > 0)
             {
                this.sub_fp.writeln(input);
+               writeln(input);
             }
          }
          catch (Exception ex)
@@ -498,6 +500,7 @@ public class Ish
       
       return more;
    }
+
    
    /////////////////////////////////////////////////////
    //
@@ -505,11 +508,23 @@ public class Ish
    //
    int finishSubShell()
    {
-      this.sub_fp.close();
+      if (sub_fp.isOpen())
+      {
+         this.sub_fp.close();
+
+         foreach (line; this.sub_out.byLine())
+         {
+             out_fp.writeln(line);
+         }
       
-      auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
+         //auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
       
-      return wait(pid);
+         return wait(this.sub_pid);
+      }
+      else
+      {
+         return this.exitStatus;
+      }
    }
    
    /////////////////////////////////////////////////////
@@ -1741,13 +1756,14 @@ else
       .setEnv(name, value, this.env, this.args);
    }
    
-   bool first;          // Is this the first line of input
+   bool first = true;          // Is this the first line of input
    
    OutBuffer       out_buf;
    File            out_fp;
    File            err_fp;
-   File            sub_fp; // Sub-shell input
-   //Pid            sub_pid;
+   File            sub_fp;  // Sub-shell input
+   File            sub_out; // Sub-shell output
+   Pid             sub_pid;
    string[]        sub_shell;
    string[string]  env;
    string[]        args;
