@@ -604,42 +604,7 @@ public class Ish
                auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd, parent.args);
                
                shell.run(this.arg);
-               auto text = output.toString();
-               
-               string[] args;
-               int s = 0;
-               int e = 0;
-               while (e < text.length)
-               {
-                  // Strip white space
-                  while ((e < text.length) && isWhite(text[e])) e++;
-                  
-                  if (e >= text.length)
-                  {
-                     // The end
-                  }
-                  else if (text[e] == '\"')
-                  {
-                     // Quoted argument
-                     e++;
-                     s = e;
-                     while ((e < text.length) && (text[e] != '\"')) e++;
-                     
-                     args ~= text[s..e].idup;
-                  }
-                  else
-                  {
-                     // Unquoted argument
-                     s = e;
-                     while ((e < text.length) && !isWhite(text[e])) e++;
-                     
-                     if (s != e)
-                     {
-                        args ~= text[s..e].idup;
-                     }
-                  }
-               }
-               return args;
+               return Decode(output.toString());
          }
       }
       
@@ -821,7 +786,6 @@ public class Ish
             string decode;
             bool   doGlobe = false;
             
-            int i = 0;
             // Expand any excaped charactors and check for glob charactors
             while (name.length > 0)
             {
@@ -835,7 +799,7 @@ public class Ish
                   // Excape
                   // TODO
                   name = name[1..$];
-                  decode ~= name[i];
+                  decode ~= name[0];
                }
                else if ((name[0] == '/') || (name[0] == '\\'))
                {
@@ -1423,7 +1387,7 @@ version ( Windows )
                      
                      exitStatus = shell.ExitStatus();
                   }
-                  else if (out_buf !is null)
+                  else
                   {
                      // Use a pipe to capture stdout as text to be processed
                         
@@ -1437,13 +1401,13 @@ version ( Windows )
                         write(buffer);
                      }
                   }
-                  else
-                  {
-                     char[] buffer;
-                     expanded[0] = fullPath;
-                     auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
-                     scope(exit) exitStatus = wait(pid);
-                  }
+                  // else
+                  // {
+                     // char[] buffer;
+                     // expanded[0] = fullPath;
+                     // auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
+                     // scope(exit) exitStatus = wait(pid);
+                  // }
                }
                catch(Exception ex)
                {

@@ -6,7 +6,7 @@ ls *.d
 echo `echo fred`
 echo \*.d
 echo *.d
-echo `ls ishmain.d`
+echo `ls sire.d`
 
 exit 7
 echo harry
