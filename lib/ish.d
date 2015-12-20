@@ -29,6 +29,7 @@ import std.file;
 import std.datetime;
 import std.path;
 import lib.url;
+import lib.LineProcessing;
 
 
 public class Ish
@@ -420,43 +421,15 @@ public class Ish
    {
       bool more = true;
       
-      const(char)[][] args;
+      string[] args;
+	  
+	  // Get the first line
+	  int i = 0;
+	  while ((i < input.length) && (input[i] != '\r') && (input[i] != '\n')) i += 1;
+	  args = Decode(input[0..i].idup);
+	  input = input[i..$];
       
-      // Split up the arguments assuming no leading spaces
-      while (input.length > 0)
-      {
-         int i = 0;
-         while ((i < input.length) && !isWhite(input[i])) i++;
-         args ~= input[0..i];
-         input = input[i..$];
-         
-         // Remove any white space
-         while ((input.length > 0) && isWhite(input[0]))
-         {
-            if (input[0] == '\r')
-            {
-               // This is the end of the first line
-               input = input[1..$];
-               
-               if ((input.length > 0) && (input[0] == '\n'))
-               {
-                  input = input[1..$];
-               }
-               break;
-            }
-            else if (input[0] == '\n')
-            {
-               // This is the end of the first line
-               input = input[1..$];
-               break;
-            }
-            else
-            {
-               // Strip the white space
-               input = input[1..$];
-            }
-         }
-      }
+      // // Split up the ar
       
       Url name = args[0];
       // This must start with an absolute path

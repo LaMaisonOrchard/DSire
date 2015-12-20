@@ -203,6 +203,19 @@ public pure string[] Decode(string line)
             // Skip the excaped character
             end++;
          }
+         else if (line[end] == '\"')
+         {
+            end += 1;
+            while((end < line.length) && (line[end] != '\"'))
+            {
+               if (line[end] == '\\')
+               {
+                  // Skip the excaped character
+                  end++;
+               }
+               end++;
+            }
+			}			
          end++;
       }
 
@@ -386,6 +399,26 @@ private pure string DecodeSingle(string arg)
             {
                work[too++] = arg[from++];
             }
+         }
+         else if (arg[from] == '\"')
+         {
+            from += 1;
+            while ((from < arg.length) && (arg[from] != '\"'))
+            {
+               if (arg[from] == '\\')
+               {
+                  from += 1;
+                  if (from < arg.length)
+                  {
+                     work[too++] = arg[from++];
+                  }
+               }
+               else
+               {
+                  work[too++] = arg[from++];
+               }
+            }
+            from += 1;
          }
          else
          {
