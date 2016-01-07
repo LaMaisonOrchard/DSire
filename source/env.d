@@ -25,7 +25,7 @@ import std.conv;
 import std.ascii;  // ASCII support
 //import std.uni;  // Unicode support
 
-import lib.LineProcessing;
+import line_processing;
 
 string[string] envRaw;  // The raw native version of the environment
 string[string] envEnc;  // The encoded version of the environment

@@ -1,3 +1,8 @@
+# DUB file
+.dub
+docs.json
+__dummy.html
+
 # Compiled Object files
 *.slo
 *.lo

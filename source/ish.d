@@ -28,7 +28,7 @@ import std.outbuffer;
 import std.file; 
 import std.datetime;
 import std.path;
-import lib.url;
+import url;
 
 
 public class Ish

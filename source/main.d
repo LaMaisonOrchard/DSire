@@ -21,10 +21,10 @@
 import std.stdio;
 import std.process;
 import std.file;
-import lib.ish;
+import ish;
 import appEnv;
 
-int main(string args[])
+int main(string[] args)
 {
    string script;
 

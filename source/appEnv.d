@@ -22,8 +22,8 @@ import std.stdio;
 import core.stdc.stdlib;
 import std.process;
 import std.file;
-import lib.ish;
-import lib.env;
+import ish;
+import env;
 
 public
 {
