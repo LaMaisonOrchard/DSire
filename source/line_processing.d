@@ -85,7 +85,7 @@ public string[] SplitLines(string text)
  * Expand the variables in the line
  *
  **/
-public pure string ExpandLine(char open, char close)(string line, int exitValue, string[string] env, string[] args ...)
+public pure string ExpandLine(char open, char close)(string line, string[] args ...)
 {
    return line; // TODO
 
@@ -154,7 +154,7 @@ public pure string ExpandLine(char open, char close)(string line, int exitValue,
                 }
             }
 
-            buffer ~= Encode(ExpandVar!(open,close)(line[start..end], exitValue, env, args));
+            buffer ~= Encode(ExpandVar!(open,close)(line[start..end], args));
             end += 1;
          }
          else
@@ -203,6 +203,19 @@ public pure string[] Decode(string line)
             // Skip the excaped character
             end++;
          }
+         else if (line[end] == '\"')
+         {
+            end += 1;
+            while((end < line.length) && (line[end] != '\"'))
+            {
+               if (line[end] == '\\')
+               {
+                  // Skip the excaped character
+                  end++;
+               }
+               end++;
+            }
+			}			
          end++;
       }
 
@@ -251,6 +264,9 @@ public pure string Encode(string[] args ...)
  **/
 public pure string NormalisePath(string path)
 {
+version ( Windows )
+{
+
    //Check for character to convert
    int count = 0;
    foreach (ch ; path)
@@ -286,6 +302,11 @@ public pure string NormalisePath(string path)
 
       return work.idup;
    }
+}
+else
+{
+   return path;
+}
 }
 
 
@@ -379,6 +400,26 @@ private pure string DecodeSingle(string arg)
                work[too++] = arg[from++];
             }
          }
+         else if (arg[from] == '\"')
+         {
+            from += 1;
+            while ((from < arg.length) && (arg[from] != '\"'))
+            {
+               if (arg[from] == '\\')
+               {
+                  from += 1;
+                  if (from < arg.length)
+                  {
+                     work[too++] = arg[from++];
+                  }
+               }
+               else
+               {
+                  work[too++] = arg[from++];
+               }
+            }
+            from += 1;
+         }
          else
          {
             work[too++] = arg[from++];
@@ -395,7 +436,7 @@ private pure string DecodeSingle(string arg)
  * Expand the variable by name. Theses are unencoded values.
  *
  **/
-private pure string[] ExpandVar(char open, char close)(string varName, int exitValue, string[string] env, string[] args ...)
+private pure string[] ExpandVar(char open, char close)(string varName, string[] args ...)
 {
     int start;
     int end;
@@ -412,18 +453,13 @@ private pure string[] ExpandVar(char open, char close)(string varName, int exitV
        start = 0;
        end = args.length;
 
-       if (name == "?")
+       if (isSplice(name, start, end))
        {
-          values~= to!string(exitValue);
-       }
-       else if (isSplice(name, start, end))
-       {
-          values+= args[start..end]; 
+          values += args[start..end]; 
        }
        else
        {
-          // Expand the environment variable
-          // TODO -- Ectract the anvironment manipulation from ish.d into its own module.
+          value ~= getEnvEnc(name);
        }
     }
 

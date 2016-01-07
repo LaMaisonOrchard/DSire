@@ -29,6 +29,7 @@ import std.file;
 import std.datetime;
 import std.path;
 import url;
+import line_processing;
 
 
 public class Ish
@@ -91,11 +92,9 @@ public class Ish
       // Is this the first input line
       if (this.first)
       {
-         first = false;
-         
+         first = false;         
          if (input.length > 2)
-         {
-            // Does the line start with a hash bang
+         {            // Does the line start with a hash bang
             if ((input[0] == '#') &&
                 (input[1] == '!'))
             {
@@ -112,14 +111,20 @@ public class Ish
          // Send the input to the sub-shell
          this.sub_fp.writeln(input);
          input = input[0..0];
-         
-         //auto rtn = tryWait(this.sub_pid);
-         //if (rtn.terminated)
+
+         // This blocks - we need a way of doing non-blocking - TODO
+         //foreach (text; this.sub_out.byLine())
          //{
-         //   sub_fp.close();
-         //   more            = false;
-         //   this.exitStatus = rtn.status;
+         //    out_fp.writeln(text);
          //}
+         
+         auto rtn = tryWait(this.sub_pid);
+         if (rtn.terminated)
+         {
+            sub_fp.close();
+            more            = false;
+            this.exitStatus = rtn.status;
+         }
       }
       
       int i = 0;
@@ -416,43 +421,15 @@ public class Ish
    {
       bool more = true;
       
-      const(char)[][] args;
+      string[] args;
+	  
+	  // Get the first line
+	  int i = 0;
+	  while ((i < input.length) && (input[i] != '\r') && (input[i] != '\n')) i += 1;
+	  args = Decode(input[0..i].idup);
+	  input = input[i..$];
       
-      // Split up the arguments assuming no leading spaces
-      while (input.length > 0)
-      {
-         int i = 0;
-         while ((i < input.length) && !isWhite(input[i])) i++;
-         args ~= input[0..i];
-         input = input[i..$];
-         
-         // Remove any white space
-         while ((input.length > 0) && isWhite(input[i]))
-         {
-            if (input[0] == '\r')
-            {
-               // This is the end of the first line
-               input = input[1..$];
-               
-               if ((input.length > 0) && (input[0] == '\n'))
-               {
-                  input = input[1..$];
-               }
-               break;
-            }
-            else if (input[0] == '\n')
-            {
-               // This is the end of the first line
-               input = input[1..$];
-               break;
-            }
-            else
-            {
-               // Strip the white space
-               input = input[1..$];
-            }
-         }
-      }
+      // // Split up the ar
       
       Url name = args[0];
       // This must start with an absolute path
@@ -460,24 +437,22 @@ public class Ish
       {
          try
          {
-            auto tmpFile = tempFile();
-            this.sub_fp.open(tmpFile, "w");
-            
             this.sub_shell = this.sub_shell[0..0];
             foreach(arg; args)
             {
                this.sub_shell ~= arg.idup;
             }
-            this.sub_shell ~= tmpFile;
             
-         //   auto pipes = pipeProcess(args, Redirect.stdin, this.env, Config.newEnv | Config.suppressConsole, cwd);
-         //   this.sub_pid = pipes.pid;
-         //   this.sub_fp  = pipes.stdin;
-         //  
+            auto pipes = pipeProcess(args, Redirect.stdin | Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+            this.sub_pid = pipes.pid;
+            this.sub_fp  = pipes.stdin;
+            this.sub_out = pipes.stdout;
+           
             // Pass through any remaining input
             if (input.length > 0)
             {
                this.sub_fp.writeln(input);
+               writeln(input);
             }
          }
          catch (Exception ex)
@@ -498,6 +473,7 @@ public class Ish
       
       return more;
    }
+
    
    /////////////////////////////////////////////////////
    //
@@ -505,11 +481,23 @@ public class Ish
    //
    int finishSubShell()
    {
-      this.sub_fp.close();
+      if (sub_fp.isOpen())
+      {
+         this.sub_fp.close();
+
+         foreach (line; this.sub_out.byLine())
+         {
+             out_fp.writeln(line);
+         }
       
-      auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
+         //auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
       
-      return wait(pid);
+         return wait(this.sub_pid);
+      }
+      else
+      {
+         return this.exitStatus;
+      }
    }
    
    /////////////////////////////////////////////////////
@@ -616,42 +604,7 @@ public class Ish
                auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd, parent.args);
                
                shell.run(this.arg);
-               auto text = output.toString();
-               
-               string[] args;
-               int s = 0;
-               int e = 0;
-               while (e < text.length)
-               {
-                  // Strip white space
-                  while ((e < text.length) && isWhite(text[e])) e++;
-                  
-                  if (e >= text.length)
-                  {
-                     // The end
-                  }
-                  else if (text[e] == '\"')
-                  {
-                     // Quoted argument
-                     e++;
-                     s = e;
-                     while ((e < text.length) && (text[e] != '\"')) e++;
-                     
-                     args ~= text[s..e].idup;
-                  }
-                  else
-                  {
-                     // Unquoted argument
-                     s = e;
-                     while ((e < text.length) && !isWhite(text[e])) e++;
-                     
-                     if (s != e)
-                     {
-                        args ~= text[s..e].idup;
-                     }
-                  }
-               }
-               return args;
+               return Decode(output.toString());
          }
       }
       
@@ -833,7 +786,6 @@ public class Ish
             string decode;
             bool   doGlobe = false;
             
-            int i = 0;
             // Expand any excaped charactors and check for glob charactors
             while (name.length > 0)
             {
@@ -847,7 +799,7 @@ public class Ish
                   // Excape
                   // TODO
                   name = name[1..$];
-                  decode ~= name[i];
+                  decode ~= name[0];
                }
                else if ((name[0] == '/') || (name[0] == '\\'))
                {
@@ -1435,7 +1387,7 @@ version ( Windows )
                      
                      exitStatus = shell.ExitStatus();
                   }
-                  else if (out_buf !is null)
+                  else
                   {
                      // Use a pipe to capture stdout as text to be processed
                         
@@ -1449,13 +1401,13 @@ version ( Windows )
                         write(buffer);
                      }
                   }
-                  else
-                  {
-                     char[] buffer;
-                     expanded[0] = fullPath;
-                     auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
-                     scope(exit) exitStatus = wait(pid);
-                  }
+                  // else
+                  // {
+                     // char[] buffer;
+                     // expanded[0] = fullPath;
+                     // auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
+                     // scope(exit) exitStatus = wait(pid);
+                  // }
                }
                catch(Exception ex)
                {
@@ -1741,13 +1693,14 @@ else
       .setEnv(name, value, this.env, this.args);
    }
    
-   bool first;          // Is this the first line of input
+   bool first = true;          // Is this the first line of input
    
    OutBuffer       out_buf;
    File            out_fp;
    File            err_fp;
-   File            sub_fp; // Sub-shell input
-   //Pid            sub_pid;
+   File            sub_fp;  // Sub-shell input
+   File            sub_out; // Sub-shell output
+   Pid             sub_pid;
    string[]        sub_shell;
    string[string]  env;
    string[]        args;
