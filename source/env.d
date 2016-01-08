@@ -103,15 +103,20 @@ version ( Windows )
 
 
    
-public void setEnv(const(char)[] name, string value)
+public void setEnv(const(char)[] name, string[] value ...)
 {
 version ( Windows )
 {
-   // Force the name to uppercase
-   name = name.toUpper;
+    // Force the name to uppercase
+    name = name.toUpper;
 }
-   envRaw[name] = value;
-   envEnc[name] = Encode(NormalisePath(value));
+    foreach (ref item ; value)
+    {
+        item = NormalisePath(item);
+    }
+   
+    envRaw[name] = Concatinate(' ', value);
+    envEnc[name] = Encode(value);
 }
 
 

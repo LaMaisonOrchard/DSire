@@ -5,8 +5,8 @@
         "verbose": false
     },
     "debug": {
-        "external_console": true,
+        "external_console": false,
         "run_args": " -ish",
-        "working_dir": null
+        "working_dir": ""
     }
 }

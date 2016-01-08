@@ -18,3 +18,35 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 *****************************************************************************/
+
+import std.stdio;
+import ish;
+
+static this()
+{
+    //Ish.register(new GitCmd());
+}
+
+            
+class GitCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "git";} 
+           
+    public void help()
+    {         
+        writeln("GIT stub");                
+    }   
+         
+    public void fullHelp()
+    {         
+        writeln("GIT stub");                
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        writeln("GIT stub");
+            
+        return 0;
+    }
+}   

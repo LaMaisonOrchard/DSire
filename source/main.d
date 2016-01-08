@@ -71,7 +71,7 @@ void sireArgs(ref string[] args)
 {
 	  
    // Read and variable definitions
-   int i = 0; // input parmeter
+   size_t i = 0; // input parmeter
    while (i < args.length)
    {
 	  string arg = args[i];

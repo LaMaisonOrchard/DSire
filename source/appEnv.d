@@ -150,7 +150,7 @@ public
 	   defaultEnv("OS",  "LINUX", baseEnv);
 	   defaultEnv("EXE", "", baseEnv);
 	   defaultEnv("OBJ", ".o", baseEnv);
-	   defaultEnv("EDITOR", Ish.getFullPath("nano", baseEnv), baseEnv);
+	   defaultEnv("EDITOR", getFullPath("nano", baseEnv), baseEnv);
 	}
 	else version( OSX )
 	{

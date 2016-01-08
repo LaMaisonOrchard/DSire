@@ -29,6 +29,7 @@ import std.file;
 import std.datetime;
 import std.path;
 import url;
+import env;
 import line_processing;
 
 
@@ -888,701 +889,229 @@ public class Ish
       state  type;
       string arg;
       Ish    parent;
-   }
+   }  
    
-   /////////////////////////////////////////////////////
-   //
-   // Process a hell command
-   //
-   // RETURN False is returned in the shell exits
-   //
-   private bool process(Element[] line)
-   {
-      bool more = true;
-      bool done = false;
+    public interface Command
+    {
+        bool matchOp (const(char)[] name); 
+        bool matchCmd(const(char)[] name);
+        
+        void help();        
+        void fullHelp();
+        
+        int run(const(char)[][] ...);
+    }
+    
+    public static class CmdException : Exception
+    {
+        this(const(char)[] msg, int rtn)
+        {
+            super(msg.idup);
+            this.rtn = rtn;
+        }        
+        
+        this(string msg, int rtn)
+        {
+            super(msg);
+            this.rtn = rtn;
+        }
+        
+        int exitCode() @property
+        {
+            return rtn;
+        }
+        
+        private int rtn;
+    }
+    
+    static private Command[] internalCmd;
+    
+    /////////////////////////////////////////////////////
+    //
+    // Register one or more commands with thse shell
+    //
+    // RETURN nothing
+    //
+    static public void register(Command[] cmd ...)
+    {
+        internalCmd ~= cmd;
+    }
+   
+    /////////////////////////////////////////////////////
+    //
+    // Process a hell command
+    //
+    // RETURN False is returned in the shell exits
+    //
+    private bool process(Element[] line)
+    {
+        bool more = true;
+        bool done = false;
       
-      const(char)[][] expanded;
+        const(char)[][] expanded;
       
-      // Expand all the elements into their final form
-      foreach(Element entry; line)
-      {
-         expanded ~= entry.expand();
-      }
+        // Expand all the elements into their final form
+        foreach(Element entry; line)
+        {
+            expanded ~= entry.expand();
+        }
       
-      // Is there anything to process
-      if (expanded.length > 0)
-      {
-         // The default is no error
-         exitStatus = 0;
-
-         // Check for operators
-         if (expanded.length > 1)
-         {
-            // Assume that this is an operator until we know better
-            done = true;
-
-            switch (expanded[1])
-            {
-               case "=":
-                  string value;	
-                  if (expanded.length > 2)
-                  {
-                     if (containsSpaces(expanded[2]))
-                     {
-                        value ~= '\"';
-                        value ~= expanded[2];
-                        value ~= '\"';
-                     }
-                     else
-                     {
-                        value ~= expanded[2];
-                     }
-                  
-                     foreach(const(char)[] item; expanded[3..$])
-                     {
-                        value ~= " ";
-                        if (containsSpaces(item))
-                        {
-                           value ~= '\"';
-                           value ~= item;
-                           value ~= '\"';
-                        }
-                        else
-                        {
-                           value ~= item;
-                        }
-                     }
-                  }
-                  setEnv(expanded[0], value);
-                  break;
-
-               default:
-                  // This is not an operator - keep looking
-                  done = false;
-                  break;
-            }
-         }
-            
-         if (!done)
-         {      
-            // Process the command
-            done = true; // This will be processed one way or another
-            switch (expanded[0])
-            {
-               case "exit":
-                  more = false;
-                  if (expanded.length > 1)
-                  {
-                     try
-                     {
-                     exitStatus = to!int(expanded[1]);
-                     }
-                     catch(Exception)
-                     {
+        // Is there anything to process
+        if (expanded.length > 0)
+        {
+            // The default is no error
+            exitStatus = 0;
+         
+            // Check for exit
+            if (expanded[0] == "exit")
+            {                  
+                if (expanded.length > 1)
+                {
+                    try
+                    {
+                        exitStatus = to!int(expanded[1]);
+                    }
+                    catch(Exception)
+                    {
                         // Bad conversion
                         err_fp.writeln("Bad argument to exit : ", expanded[1]);
                         exitStatus = -1;
-                     }
-                  }
-                  break;
+                    }
+                }
+             
+                return false;
+            }
+         
+            // Check for help
+            if (expanded[0] == "help")
+            { 
+                if (expanded.length == 1)
+                {
+                    writeln("exit [<exit code>]");
+                    writeln("   Terminate the shell returning the given exit code.");
+                    writeln("   If no exit code is specified the the exit code of the");
+                    writeln("   last command is returned.");
+                    writeln("help [<command>]");
+                    writeln("   Output help on built is commands.");         // Check for operators  
                
-            case "echo":
-               const(char)[][] items = expanded[1..$];
-               
-               if (items.length > 0)
-               {	
-                  if (containsSpaces(items[0]))
-                  {
-                     write('\"');
-                     write(items[0]);
-                     write('\"');
-                  }
-                  else
-                  {
-                     write(items[0]);
-                  }
-                  
-                  foreach(const(char)[] item; items[1..$])
-                  {
-                     write(" ");
-                     if (containsSpaces(item))
-                     {
-                        write('\"');
-                        write(item);
-                        write('\"');
-                     }
-                     else
-                     {
-                        write(item);
-                     }
-                  }
-               }
-               writeln();
-               
-               // No errors
-               exitStatus = 0;
-               break;
-               
-            case "which":
-               const(char)[][] items = expanded[1..$];
-               
-               if (items.length > 0)
-               {      
-                  auto fullPath = getFullPath(items[0].idup);
-                  if (containsSpaces(fullPath))
-                  {
-                     write('\"');
-                     write(fullPath);
-                     write('\"');
-                  }
-                  else
-                  {
-                     write(fullPath);
-                  }
-                  
-                  foreach(const(char)[] item; items[1..$])
-                  {
-                     fullPath = getFullPath(item.idup);
-                     
-                     write(" ");
-                     if (containsSpaces(fullPath))
-                     {
-                        write('\"');
-                        write(fullPath);
-                        write('\"');
-                     }
-                     else
-                     {
-                        write(fullPath);
-                     }
-                  }
-               }
-               writeln();
-               
-               // No errors
-               exitStatus = 0;
-               break;
-               
-            case "cd":
-               const(char)[][] items = expanded[1..$];
-               
-               if (items.length != 1)
-               {  
-                  // Illeagl args
-                  err_fp.writeln("cd <dir>");
-                  exitStatus = -1;      
-               }
-               else
-               {
-                  try
-                  {
-                     // Try to change directory
-                     chdir(items[0]);
-                     cwd = getcwd();
-                     env["PWD"]   = cwd;
-                  }
-                  catch (Exception ex)
-                  {
-                     err_fp.writeln(ex.msg);
-                     exitStatus = -1;
-                  }
-               }
-               break;
-               
-            case "mkdir":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length == 0)
-               {  
-                  // Illeagl args
-                  err_fp.writeln("mkdir {<directory>}");
-                  exitStatus = -1;      
-               }
-               else
-               {  
-                  foreach(const(char)[] item; items[0..$])
-                  {
-                     try
-                     {
-                        if (!exists(item) || !isDir(item))
+                    foreach (cmd; internalCmd)
+                    {
+                        cmd.help();
+                    }
+                }
+                else if (expanded.length > 1)
+                {
+                    foreach (cmd; internalCmd)
+                    {
+                        if (cmd.matchOp(expanded[1]) || cmd.matchCmd(expanded[1]))
                         {
-                           mkdirRecurse(item);
+                            cmd.help();
+                            return true; 
                         }
-                     }
-                     catch(Exception ex)
-                     {
-                        // Report and errors thrown by the process
-                        err_fp.writeln(ex.msg);
-                        exitStatus = -1;
-                     }
-                  }
-               }
-               
-               break;
-               
-            case "rmdir":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length == 0)
-               {  
-                  // Illeagl args
-                  err_fp.writeln("rmdir {<directory>}");
-                  exitStatus = -1;      
-               }
-               else
-               {  
-                  foreach(const(char)[] item; items[0..$])
-                  {
-                     try
-                     {
-                        if (exists(item) && isDir(item))
-                        {
-                           rmdirRecurse(item);
-                        }
-                     }
-                     catch(Exception ex)
-                     {
-                        // Report and errors thrown by the process
-                        err_fp.writeln(ex.msg);
-                        exitStatus = -1;
-                     }
-                  }
-               }
-               
-               break;
-               
-            case "help":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length == 0)
-               {  
-                  writeln("ish version 1.0.0");
-                  writeln("help <command>");
-               }
-               else
-               {  
-                  switch(items[0])
-                  {
-                     case "exit":
-                        writeln("exit [<exit code>]");
-                        writeln("   Terminate the shell returning the given exit code.");
-                        writeln("   If no exit code is specified the the exit code of the");
-                        writeln("   last command is returned.");
-                        break;
+                    } 
+                
+                    writeln("Unknown command");
+                }
+            
+                return true; 
+            }
+         
+            try
+            {
+                // Check for operators     
+                foreach (cmd; internalCmd)
+                {
+                    if ((expanded.length > 1) && cmd.matchOp(expanded[1]))
+                    {
+                        exitStatus = cmd.run(expanded);
+                        return true;
+                    }
+                }  
+                         
+                // Check for commands  
+                foreach (cmd; internalCmd)
+                {
+                    if (cmd.matchCmd(expanded[0]))
+                    {
+                        exitStatus = cmd.run(expanded);
+                        return true;
+                    }
+                } 
                         
-                     case "echo":
-                        writeln("echo {<arg>}");
-                        writeln("   Write out the list of arguments. Arguments containing");
-                        writeln("   white space will be quoted.");
-                        break;
-                        
-                     case "cd":
-                        writeln("cd <dir>");
-                        writeln("   Change the current working directory. The environment");
-                        writeln("   variable PWD is updated to reflext the new directory.");
-                        break;
-                        
-                     case "mkdir":
-                        writeln("mkdir {<directory>}");
-                        writeln("   Create the specified directory paths. No error is reported");
-                        writeln("   if the path already exists.");                        
-                        break;
-                        
-                     case "rmdir":
-                        writeln("rmdir {<directory>}");
-                        writeln("   Delete the specified directory (and sub-directries).");                        
-                        break;
+                // Execute the command as a program
+                auto fullPath = getFullPath(expanded[0].idup);
                   
-                     case "help":
-                        writeln("help [<command>]");
-                        writeln("   Output help on built is commands.");
-                     break;
-                  
-                     case "touch":
-                        writeln("mkdir {<file>}");
-                        writeln("   Create the file of update is modified time to the current time.");                        
-                        break;
-                  
-                     case "which":
-                        writeln("which {<file>}");
-                        writeln("   Write out the full path of each executable file.");                        
-                        break;
-                        
-                     case "copy":
-                        writeln("copy <from> <to>");
-                        writeln("   Copy the file from one location to another.");   
-                        break;
-                        
-                     case "move":
-                        writeln("move <from> <to>");
-                        writeln("   Move the file from one location to another.");                        
-                     break;
-                     
-                     default:
-                        break;
-                  }
-               }
-               
-               break;
-               
-            case "touch":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length > 0)
-               {  
-                  foreach(const(char)[] item; items[0..$])
-                  {
-                     try
-                     {
-                        if (exists(item))
-                        {
-                           setTimes(item, Clock.currTime, Clock.currTime);
-                        }
-                        else
-                        {
-                           File fp;
-                           fp.open(item.idup, "w");
-                           scope(exit) fp.close();
-                        }
-                     }
-                     catch(Exception ex)
-                     {
-                        // Report and errors thrown by the process
-                        err_fp.writeln("Failed to touch : " ~ item);
-                        exitStatus = -1;
-                     }
-                  }
-               }
-               
-               break;
-               
-            case "copy":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length != 2)
-	       {
-                  // Illeagl args
-                  err_fp.writeln("copy <from> <to>");
-                  exitStatus = -1;
-               }
-               else
-               {
-                  try
-                  {
-                     copy(items[0], items[1]);
-                  }
-                  catch (Exception ex)
-                  {
-                     // Report and errors thrown by the process
-                     err_fp.writeln(ex.msg);
-                     exitStatus = -1;
-                  }
-               }
-               
-               break;
-               
-            case "move":
-               const(char)[][] items = expanded[1..$];
-               
-               // No errors
-               exitStatus = 0;
-               
-               if (items.length != 2)
-	       {
-                  // Illeagl args
-                  err_fp.writeln("move <from> <to>");
-                  exitStatus = -1;
-               }
-               else
-               {
-                  try
-                  {
-                     rename(items[0], items[1]);
-                  }
-                  catch (Exception ex)
-                  {
-                     // Report and errors thrown by the process
-                     err_fp.writeln(ex.msg);
-                     exitStatus = -1;
-                  }
-               }
-               
-               break;
-               
-            default:
-               // Execute the command as a program
-               try
-               {
-                  auto fullPath = getFullPath(expanded[0].idup);
-                  
-                  if (fullPath.length == 0)
-                  {
-                     // No executable found
-                     err_fp.writeln("No such programs : " ~ expanded[0]);
-                     exitStatus = -1;
-                  }
-                  else if (isScript(fullPath))
-                  {
-                     auto appName = fullPath;
+                if (fullPath.length == 0)
+                {
+                    // No executable found
+                    err_fp.writeln("No such programs : " ~ expanded[0]);
+                    exitStatus = -1;
+                }
+                else if (isScript(fullPath))
+                {
+                    auto appName = fullPath;
 version ( Windows )
 {
-                     if ((fullPath.length > 4) && (fullPath[$-4..$] == ".bat"))
-                     {
+                    if ((fullPath.length > 4) &&
+                        (fullPath[$-4..$] == ".bat") &&
+                        (fullPath[$-4..$] == ".cmd"))
+                    {
                         // Windows batch file
                         appName = getFullPath("cmd.exe");
-                     }
+                    }
 }
-                     // Run the file as a script
-                     File input;
+                    // Run the file as a script
+                    File input;
     
-                     input.open(fullPath, "r");
-                     scope(exit) input.close();
+                    input.open(fullPath, "r");
+                    scope(exit) input.close();
                      
-                     string[] args;
-                     args ~= appName;
-                     foreach (const(char)[] arg; expanded[1..$]) args ~= arg.idup;
-                     auto shell  = new Ish(this.err_fp, this.err_fp, this.env, this.cwd, args);
+                    string[] args;
+                    args ~= appName;
+                    foreach (const(char)[] arg; expanded[1..$]) args ~= arg.idup;
+                    auto shell  = new Ish(this.err_fp, this.err_fp, this.env, this.cwd, args);
                      
-                     foreach (inputLine; input.byLine())
-                     {
+                    foreach (inputLine; input.byLine())
+                    {
                         if (!shell.run(inputLine))
                         {
-                           break;
+                            break;
                         }
-                     }
+                    }
                      
-                     exitStatus = shell.ExitStatus();
-                  }
-                  else
-                  {
-                     // Use a pipe to capture stdout as text to be processed
+                    exitStatus = shell.ExitStatus();
+                }
+                else
+                {
+                    // Use a pipe to capture stdout as text to be processed
                         
-                     char[] buffer;
-                     expanded[0] = fullPath;
-                     auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
-                     scope(exit) exitStatus = wait(pipes.pid);
+                    char[] buffer;
+                    expanded[0] = fullPath;
+                    auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+                    scope(exit) exitStatus = wait(pipes.pid);
                         
-                     while (0 < pipes.stdout.readln(buffer))
-                     {
+                    while (0 < pipes.stdout.readln(buffer))
+                    {
                         write(buffer);
-                     }
-                  }
-               }
-               catch(Exception ex)
-               {
-                  // Report and errors thrown by the process
-                  err_fp.writeln(ex.msg);
-                  exitStatus = -1;
-               }
-               break;
-         }
-         }
-      }
-      
-      return more;
-   }
-   
-   /////////////////////////////////////////////////////
-   //
-   // Find the absolute full path to the executable
-   //
-   // RETURN The full path
-   //
-   static public string getFullPath(string name, string[string] env = null)
-   {
-      string tmp;
-version ( Windows )
-{
-      // If this does not have a suffix then add '.exe'
-      if (extension(name) == "")
-      {
-         name = name ~ ".exe";
-      }
-}
-      
-      if (env == null)
-      {
-         env = environment.toAA();
-      }
-      
-      // Check for an absolute path
-      if (absolutePath(name))
-      {
-         // Absolute path
-         return name;
-      }
-      
-      // Is the path specified
-      foreach (ch; name)
-      {
-         if ((ch == '/') || (ch == '\\'))
-         {
-            tmp = getcwd() ~ "/" ~ name;
-            if (executableFile(tmp))
-            {
-               return tmp;
+                    }
+                }
             }
-            else
+            catch(CmdException ex)
             {
-               return "";
+                // Report and errors thrown by the process
+                err_fp.writeln(ex.msg);
+                exitStatus = ex.exitCode;
             }
-         }
-      }
-      
-version ( Windows )
-{
-      immutable(char) psep = ';';
-      
-      string[] varList1 =
-      [
-         "PROGRAMFILES",
-         "PROGRAMFILES(X86)",
-         "PROGRAMW6432",
-         "COMMONPROGRAMFILES",
-         "COMMONPROGRAMFILES(X86)",
-         "COMMONPROGRAMW6432"
-      ];
-      
-      string[] varList2 =
-      [
-         "WINDIR",
-         "SystemRoot"
-      ];
-         
-      // The directory from which the application loaded.
-      tmp = thisExePath() ~ "/" ~ name;
-      if (executableFile(tmp))
-      {
-         return tmp;
-      }
-      
-      // The current directory for the parent process.
-      tmp = getcwd() ~ "/" ~ name;
-      if (executableFile(tmp))
-      {
-         return tmp;
-      }
-      
-      foreach(envVar; varList1)
-      {
-         tmp = .getEnv(envVar, env);
-         if (tmp.length > 0)
-         {
-            foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+            catch(Exception ex)
             {
-               if (executableFile(tmp1))
-               {
-                  return tmp1;
-               }
+                // Report and errors thrown by the process
+                err_fp.writeln(ex.msg);
+                exitStatus = -1;
             }
-         }
-      }
+        }
       
-      foreach(envVar; varList2)
-      {
-         tmp = .getEnv(envVar, env);
-         if (tmp.length > 0)
-         {
-            foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
-            {
-               if (executableFile(tmp1))
-               {
-                  return tmp1;
-               }
-            }
-         }
-      }
-}
-else
-{
-      immutable(char) psep = ':';
-      
-}
-
-      // The directories listed in the PATH environment variable.
-      auto path = .getEnv("PATH", env);
-      
-      int i = 0;
-      while (i < path.length)
-      {
-         if (path[i] == psep)
-         {
-            // Is a path specified
-            if (i > 0)
-            {
-               // Combine this with the file name and check if it is an executable
-               tmp = buildPath(path[0..i], name);
-               if (executableFile(tmp))
-               {
-                  return tmp;
-               }
-            }
-            
-            // Strip this element out
-            path = path[i+1.. $];
-            i = 0;
-         }
-         else
-         {
-            i++;
-         }
-      }
-      
-      // Check any remaining path
-      if (path.length > 0)
-      {
-         tmp = buildPath(path[0..$], name);
-         if (executableFile(tmp))
-         {
-            return tmp;
-         }
-      }
-
-      return "";
-   }
-      
-   static string buildPath(string path, string name)
-   {
-      if (absolutePath(path))
-      {
-         // Absolute path
-         return path ~ "/" ~ name;
-      }
-      else
-      {
-         // Relative path
-         return getcwd() ~ "/" ~ path ~ "/" ~ name;
-      }
-   }
-   
-   
-   static bool absolutePath(const(char)[] name)
-   {
-      Url tmp = name;
-      return ((tmp.path.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
-   }
-   
-   
-   static bool executableFile(const(char)[] name)
-   {
-      bool exe = (exists(name) && isFile(name));
-      return exe;
-   }
+        return true;
+    }
    
     
    /////////////////////////////////////////////////////
@@ -1644,19 +1173,6 @@ else
       }
    }
    
-   bool containsSpaces(const(char)[] text)
-   {
-      foreach(char ch; text)
-      {
-         if (isWhite(ch))
-         {
-            return true;
-         }
-      }
-      
-      return false;
-   }
-   
    private string getEnv(const(char)[] name)
    {
       return .getEnv(name, this.env, this.args);
@@ -1684,6 +1200,447 @@ else
    
    static immutable char escCh = '%';
 }
+
+///////// Commands /////////////////////////////////////////////////////
+
+static this()
+{
+    Ish.register
+    (
+        new AsignCmd(),
+        new EchoCmd(),
+        new WhichCmd(),
+        new CdCmd(),
+        new MkdirCmd(),
+        new RmdirCmd(),
+        new TouchCmd(),
+        new CopyCmd(),
+        new MoveCmd()
+    );
+}
+
+class AsignCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return name == "=";}
+    public bool matchCmd(const(char)[] name) {return false;}
+        
+    public void help()
+    {                        
+        writeln("<var> = {<value>}");
+    }     
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {      
+        auto name = items[0];
+            
+        items = items[2..$];
+            
+        string[] args;
+        args.length = items.length;
+        foreach (idx, item; items)
+        {
+            args[idx] = item.idup;
+        }
+                     
+        //env.setEnv(name, args);
+               
+        // No errors
+        return 0;
+    }
+}
+     
+class EchoCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "echo";}
+        
+    public void help()
+    {                        
+        writeln("echo {<arg>}");
+        writeln("   Write out the list of arguments. Arguments containing");
+        writeln("   white space will be quoted.");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {      
+        items = items[1..$];
+                     
+        if (items.length > 0)
+        {	
+            if (containsSpaces(items[0]))
+            {
+                write('\"');
+                write(items[0]);
+                write('\"');
+            }
+            else
+            {
+                write(items[0]);
+            }
+                  
+            foreach(const(char)[] item; items[1..$])
+            {
+                write(" ");
+                if (containsSpaces(item))
+                {
+                    write('\"');
+                    write(item);
+                    write('\"');
+                }
+                else
+                {
+                    write(item);
+                }
+            }
+        }
+        writeln();
+               
+        // No errors
+        return 0;
+    }
+}
+      
+class WhichCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "which";}
+        
+    public void help()
+    {
+        writeln("which {<file>}");
+        writeln("   Write out the full path of each executable file."); 
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    { 
+       items = items[1..$];
+                     
+        if (items.length > 0)
+        {      
+            auto fullPath = getFullPath(items[0].idup);
+            if (containsSpaces(fullPath))
+            {
+                write('\"');
+                write(fullPath);
+                write('\"');
+            }
+            else
+            {
+                write(fullPath);
+            }
+                  
+            foreach(const(char)[] item; items[1..$])
+            {
+                fullPath = getFullPath(item.idup);
+                     
+                write(" ");
+                if (containsSpaces(fullPath))
+                {
+                    write('\"');
+                    write(fullPath);
+                    write('\"');
+                }
+                else
+                {
+                    write(fullPath);
+                }
+            }
+        }
+        writeln();
+               
+        // No errors
+        return 0;
+    }
+} 
+          
+class CdCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "cd";}
+        
+    public void help()
+    {                        
+        writeln("cd <dir>");
+        writeln("   Change the current working directory. The environment");
+        writeln("   variable PWD is updated to reflext the new directory.");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        items = items[1..$];
+               
+        if (items.length != 1)
+        {  
+            // Illeagl args
+            throw new Ish.CmdException("cd <dir>", -1); 
+        }
+        else
+        {
+            try
+            {
+                // Try to change directory
+                chdir(items[0]);
+                //env["PWD"] = getcwd(); // TODO
+            }
+            catch (Exception ex)
+            {
+                throw new Ish.CmdException(ex.msg, -1); 
+            }
+        }
+            
+        return 0;
+    }
+}     
+      
+class MkdirCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "mkdir";}
+        
+    public void help()
+    {                        
+        writeln("mkdir {<directory>}");
+        writeln("   Create the specified directory paths. No error is reported");
+        writeln("   if the path already exists.");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    { 
+        items = items[1..$];
+               
+        if (items.length == 0)
+        {  
+            // Illeagl args
+            throw new Ish.CmdException("mkdir {<directory>}", -1);   
+        }
+        else
+        {  
+            foreach(const(char)[] item; items[0..$])
+            {
+                try
+                {
+                    if (!exists(item) || !isDir(item))
+                    {
+                       mkdirRecurse(item);
+                    }
+                }
+                catch(Exception ex)
+                {
+                    // Report and errors thrown by the process
+                    throw new Ish.CmdException(ex.msg, -1);   
+                }
+            }
+        }
+            
+        return 0;
+    }
+}    
+      
+class RmdirCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "rmdir";}
+    public void help()
+    {
+        writeln("rmdir {<directory>}");
+        writeln("   Delete the specified directory (and sub-directries).");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        items = items[1..$]; 
+
+        if (items.length == 0)
+        {  
+            // Illeagl args
+            throw new Ish.CmdException("rmdir {<directory>}", -1);     
+        }
+        else
+        {  
+            foreach(const(char)[] item; items[0..$])
+            {
+                try
+                {
+                    if (exists(item) && isDir(item))
+                    {
+                        rmdirRecurse(item);
+                    }
+                }
+                catch(Exception ex)
+                {
+                    // Report and errors thrown by the process
+                    throw new Ish.CmdException(ex.msg, -1);   
+                }
+            }
+        }
+            
+        return 0;
+    }
+} 
+               
+           
+               
+      
+class TouchCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "touch";}
+        
+    public void help()
+    { 
+        writeln("mkdir {<file>}");
+        writeln("   Create the file of update is modified time to the current time.");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        items = items[1..$];
+        if (items.length > 0)
+        {  
+            foreach(const(char)[] item; items[0..$])
+            {
+                try
+                {
+                    if (exists(item))
+                    {
+                        setTimes(item, Clock.currTime, Clock.currTime);
+                    }
+                    else
+                    {
+                        File fp;
+                        fp.open(item.idup, "w");
+                        scope(exit) fp.close();
+                    }
+                }
+                catch(Exception ex)
+                {
+                    // Report and errors thrown by the process
+                    throw new Ish.CmdException("Failed to touch : " ~ item, -1);   
+                }
+            }
+        }
+            
+        return 0;
+    }
+} 
+            
+class CopyCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "copy";}
+        
+    public void help()
+    {                        
+        writeln("copy <from> <to>");
+        writeln("   Copy the file from one location to another."); 
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        items = items[1..$];
+            
+        if (items.length != 2)
+        {
+            // Illeagl args
+            throw new Ish.CmdException("copy <from> <to>", -1);  
+        }
+        else
+        {
+            try
+            {
+                copy(items[0], items[1]);
+            }
+            catch (Exception ex)
+            {
+                // Report and errors thrown by the process
+                throw new Ish.CmdException(ex.msg, -1);  
+            }
+        }
+            
+        return 0;
+    }
+}    
+          
+class MoveCmd : Ish.Command
+{
+    public bool matchOp (const(char)[] name) {return false;}
+    public bool matchCmd(const(char)[] name) {return name == "move";}
+        
+    public void help()
+    {
+        writeln("move <from> <to>");
+        writeln("   Move the file from one location to another.");
+    }   
+       
+    public void fullHelp()
+    {                        
+        help();
+    }
+        
+    public int run(const(char)[][] items ...)
+    {
+        items = items[1..$];
+        if (items.length != 2)
+        {
+            // Illeagl args
+            throw new Ish.CmdException("move <from> <to>", -1);
+        }
+        else
+        {
+            try
+            {
+                rename(items[0], items[1]);
+            }
+            catch (Exception ex)
+            {
+                // Report and errors thrown by the process 
+                throw new Ish.CmdException(ex.msg, -1);  
+            }
+        }
+            
+        return 0;
+    }
+} 
 
 
 
@@ -1826,4 +1783,208 @@ public string tempFile()
 {
    // TODO
    return tempDir() ~ "/fred";
+}   
+
+private bool containsSpaces(const(char)[] text)
+{
+  foreach(char ch; text)
+  {
+     if (isWhite(ch))
+     {
+        return true;
+     }
+  }
+      
+  return false;
 }
+
+   
+      
+string buildPath(string path, string name)
+{
+    if (absolutePath(path))
+    {
+        // Absolute path
+        return path ~ "/" ~ name;
+    }
+    else
+    {
+        // Relative path
+        return getcwd() ~ "/" ~ path ~ "/" ~ name;
+    }
+}
+   
+   
+bool absolutePath(const(char)[] name)
+{
+    Url tmp = name;
+    return ((tmp.path.length > 0) && ((tmp.scheme.length == 1) || (tmp.path[0] == '/')));
+}
+   
+   
+bool executableFile(const(char)[] name)
+{
+    bool exe = (exists(name) && isFile(name));
+    return exe;
+}
+     
+   
+/////////////////////////////////////////////////////
+//
+// Find the absolute full path to the executable
+//
+// RETURN The full path
+//
+public string getFullPath(string name, string[string] env = null)
+{
+    string tmp;
+version ( Windows )
+{
+    // If this does not have a suffix then add '.exe'
+    if (extension(name) == "")
+    {
+        name = name ~ ".exe";
+    }
+}
+      
+    if (env == null)
+    {
+        env = environment.toAA();
+    }
+      
+    // Check for an absolute path
+    if (absolutePath(name))
+    {
+        // Absolute path
+        return name;
+    }
+      
+    // Is the path specified
+    foreach (ch; name)
+    {
+        if ((ch == '/') || (ch == '\\'))
+        {
+            tmp = getcwd() ~ "/" ~ name;
+            if (executableFile(tmp))
+            {
+                return tmp;
+            }
+            else
+            {
+                return "";
+            }
+        }
+    }
+      
+version ( Windows )
+{
+    immutable(char) psep = ';';
+      
+    string[] varList1 =
+    [
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
+        "PROGRAMW6432",
+        "COMMONPROGRAMFILES",
+        "COMMONPROGRAMFILES(X86)",
+        "COMMONPROGRAMW6432"
+    ];
+      
+    string[] varList2 =
+    [
+        "WINDIR",
+        "SystemRoot"
+    ];
+         
+    // The directory from which the application loaded.
+    tmp = thisExePath() ~ "/" ~ name;
+    if (executableFile(tmp))
+    {
+        return tmp;
+    }
+      
+    // The current directory for the parent process.
+    tmp = getcwd() ~ "/" ~ name;
+    if (executableFile(tmp))
+    {
+        return tmp;
+    }
+      
+    foreach(envVar; varList1)
+    {
+        tmp = .getEnv(envVar, env);
+        if (tmp.length > 0)
+        {
+            foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+            {
+                if (executableFile(tmp1))
+                {
+                  return tmp1;
+                }
+            }
+        }
+    }
+      
+    foreach(envVar; varList2)
+    {
+        tmp = .getEnv(envVar, env);
+        if (tmp.length > 0)
+        {
+            foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
+            {
+                if (executableFile(tmp1))
+                {
+                    return tmp1;
+                }
+            }
+        }
+    }
+}
+else
+{
+    immutable(char) psep = ':';
+      
+}
+
+    // The directories listed in the PATH environment variable.
+    auto path = .getEnv("PATH", env);
+      
+    int i = 0;
+    while (i < path.length)
+    {
+        if (path[i] == psep)
+        {
+            // Is a path specified
+            if (i > 0)
+            {
+                // Combine this with the file name and check if it is an executable
+                tmp = buildPath(path[0..i], name);
+                if (executableFile(tmp))
+                {
+                  return tmp;
+                }
+            }
+            
+            // Strip this element out
+            path = path[i+1.. $];
+            i = 0;
+        }
+        else
+        {
+            i++;
+        }
+    }
+      
+    // Check any remaining path
+    if (path.length > 0)
+    {
+        tmp = buildPath(path[0..$], name);
+        if (executableFile(tmp))
+        {
+            return tmp;
+        }
+    }
+
+    return "";
+}
+
