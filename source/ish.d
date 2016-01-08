@@ -28,8 +28,8 @@ import std.outbuffer;
 import std.file; 
 import std.datetime;
 import std.path;
-import lib.url;
-import lib.LineProcessing;
+import url;
+import line_processing;
 
 
 public class Ish
