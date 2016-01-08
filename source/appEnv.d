@@ -38,7 +38,7 @@ public
 	}
 
 
-	void setEnvironment(string[] args)
+	void setEnvironment(ref string[] args)
 	{
 	   baseEnv = environment.toAA();
 	   setEnv(environment.toAA());
@@ -48,53 +48,38 @@ public
 	   args = args[1..$];
 	  
 	   // Read and variable definitions
-	   while (args.length > 0)
+       int i = 0; // input parmeter
+       int o = 0; // output parameter
+	   while (i < args.length)
 	   {
-		string arg = args[0];
-		  args = args[1..$];
+		  string arg = args[i];
 
-		  if ((arg == "-params") || (arg == "-p"))
-		  {
-			 // everything else are shell parameters
-			 params = args;
-			 args = args[$..$];
-		  }
-		  else if (arg == "-c")
-		  {
-			 // Set the configuration
-			 if (args.length >0)
-			 {
-				setEnv("CONFIG", args[0], baseEnv);
-				args = args[1..$];
-			 }
-		  }		  
-          else if (arg == "-ni")
-		  {
-			 // Set not interactive
-			 isInteractive = false;
-		  }		  
-          else if (arg == "-ish")
+		  if (arg == "-ish")
 		  {
 			 // Set not interactive
 			 appName = "ish";
+             i += 1;
 		  }		  
           else if (arg == "-sire")
 		  {
 			 // Set not interactive
 			 appName = "sire";
+             i += 1;
 		  }		  
           else if (arg == "-env")
 		  {
 			 // Set not interactive
 			 appName = "env";
+             i += 1;
 		  }
 		  else if (arg == "-C")
 		  {
 			 // Set the working directory
-			 if (args.length >0)
+             i += 1;
+			 if (i < args.length)
 			 {
-				chdir(args[0]);
-				args = args[1..$];
+				chdir(args[i]);
+                i += 1;
 			 }
 		  }
 		  else if ((arg == "-i") || (arg == "-v") || (arg == "--version"))
@@ -108,39 +93,43 @@ public
 			 string value = "1";
 			 arg = "";
 			 
-			 for (int i = 0; (i < name.length); i++)
+			 for (int j = 0; (j < name.length); j++)
 			 {
-				if (name[i] == '=')
+				if (name[j] == '=')
 				{
-				   value = name[i+1..$];
-				   name  = name[0..i];
+				   value = name[j+1..$];
+				   name  = name[0..j];
 				   break;
 				}
 			 }
 			 
-			 setEnv(name, value, baseEnv);
+			 setEnv(name, value, baseEnv); 
+             i += 1;
 		  }
 		  else if ((arg.length > 2) && (arg[0..2] == "-U"))
 		  {
 			 string name  = arg[2..$];
 			 
-			 for (int i = 0; (i < name.length); i++)
+			 for (int j = 0; (j < name.length); j++)
 			 {
-				if (name[i] == '=')
+				if (name[j] == '=')
 				{
-				   name  = name[0..i];
+				   name  = name[0..j];
 				   break;
 				}
 			 }
 			 
 			 unsetEnv(name, baseEnv);
+             i += 1;
 		  }
-		  else if (arg[0] != '-')
+		  else
 		  {
-			 targets ~= arg;
+			 args[o++] = args[i++];
 		  }
-
 	   }
+       
+       // Trim back the array
+       args.length = o;
 
 	version( Win32 )
 	{
@@ -191,6 +180,7 @@ public
 	   defaultEnv("CONFIG", "DEBUG",   baseEnv);
 	}
 }
+
 
 private
 {

@@ -13,7 +13,10 @@ TARGET | .git bin/ish bin/sire
 {
 }
 
-
+info
+{
+   gitk
+}
 
 // SIRE dependencies ////////////////////////////////////////////////
 

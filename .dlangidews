@@ -1,0 +1,7 @@
+{
+    "name": null,
+    "description": null,
+    "projects": {
+        "sire": "dub.json"
+    }
+}

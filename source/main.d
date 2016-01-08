@@ -28,25 +28,27 @@ int main(string[] args)
 {
    string script;
 
-   setEnvironment(args[0..$]);
+   setEnvironment(args);
    
    switch(AppName())
    {
        case "ish":
-          return ishMain();
+          return ishMain(args);
 
        case "env":
-          return envMain();
+          return envMain(args);
 
        case "sire":
        default:
-          return sireMain();
+          return sireMain(args);
     }
 }
 
-int sireMain()
+int sireMain(string[] args)
 {
    int status = 0;
+   
+   sireArgs(args);
 
    // Display the environment
    foreach (string name, string value; Env())
@@ -65,7 +67,40 @@ int sireMain()
    return status;
 }
 
-int envMain()
+void sireArgs(ref string[] args)
+{
+	  
+   // Read and variable definitions
+   int i = 0; // input parmeter
+   while (i < args.length)
+   {
+	  string arg = args[i];
+
+
+	  if ((arg == "-params") || (arg == "-p"))
+	  {
+		 // everything else are shell parameters
+		 args = args[i+1..$];
+		 i = args.length;
+	  }
+	  else if (arg == "-c")
+	  {
+		 // Set the configuration
+         i += 1;
+		 if (i < args.length)
+		 {
+			//setEnv("CONFIG", args[i], baseEnv);
+			i += 1;
+		 }
+	  }	
+	  else if (arg[0] != '-')
+	  {
+		 //targets ~= arg;
+	  }
+   }
+}
+
+int envMain(string[] args)
 {
    int status = 0;
 
@@ -80,9 +115,12 @@ int envMain()
 }
 
 
-int ishMain()
+int ishMain(string[] args)
 {
+    bool interactive;
     int status = 0;
+    
+    ishArgs(args, interactive);
     
     File input = stdin;
     
@@ -126,4 +164,24 @@ int ishMain()
     
         return shell.ExitStatus();
     }
+}
+
+void ishArgs(ref string[] args, ref bool interactive)
+{
+   // Read and variable definitions
+   interactive = true; // Interactive by default
+   
+   int i = 0; // input parmeter
+   while (i < args.length)
+   {
+	  string arg = args[i];
+
+
+	  if (arg == "-ni")
+	  {
+		 // Set the configuration
+         interactive = false;
+         i += 1;
+	  }	
+   }
 }
