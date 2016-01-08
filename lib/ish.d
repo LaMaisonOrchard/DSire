@@ -566,30 +566,11 @@ public class Ish
          {
             default:
                return [""];  // Should never get here
-               
-            case state.ARG:    
-               auto name  = expandVariables(this.arg).idup;
-               auto split = splitWhite(name);
-
-               string[] list;
-               foreach (n; split)
-               {
-                  auto exp = glob(n);
-                  if (exp.length == 0)
-                  {
-                     list ~= decode(n);
-                  }
-                  else
-                  {
-                     list ~= exp;
-                  }
-               }
-
-               return list;
-                  
+                                 
+            case state.ARG:
             case state.DOUBLE_QUOTE:   
                auto name = expandVariables(this.arg).idup;
-               auto list = glob(name);
+               auto list = glob(DecodeSingle(name));
                if (list.length == 0)
                {
                   return [decode(name)];
@@ -838,7 +819,7 @@ public class Ish
                   {
                      if (name.length == 0)
                      {
-                        rtn ~= p.name;
+                        rtn ~= NormalisePath(p.name);
                      }
                      else if (!isDir(p.name))
                      {
@@ -1401,13 +1382,6 @@ version ( Windows )
                         write(buffer);
                      }
                   }
-                  // else
-                  // {
-                     // char[] buffer;
-                     // expanded[0] = fullPath;
-                     // auto pid = spawnProcess(expanded, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd); 
-                     // scope(exit) exitStatus = wait(pid);
-                  // }
                }
                catch(Exception ex)
                {

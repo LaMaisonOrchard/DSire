@@ -22,6 +22,7 @@
 import std.conv;
 import std.ascii;  // ASCII support
 //import std.uni;  // Unicode support
+import std.stdio;
 
 
 /**********************************************************
@@ -367,7 +368,7 @@ private pure string EncodeSingle(string arg)
  * by Encode();
  *
  **/
-private pure string DecodeSingle(string arg)
+public pure string DecodeSingle(string arg)
 {
    //Check the number of character to excape
    int count = 0;
