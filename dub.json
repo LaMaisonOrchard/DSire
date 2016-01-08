@@ -1,0 +1,6 @@
+{
+    "name": "sire",
+    "targetName": "sire",
+    "targetType": "executable",
+    "targetPath": "bin"
+}

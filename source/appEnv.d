@@ -67,11 +67,26 @@ public
 				setEnv("CONFIG", args[0], baseEnv);
 				args = args[1..$];
 			 }
-		  }
-		  else if (arg == "-ni")
+		  }		  
+          else if (arg == "-ni")
 		  {
 			 // Set not interactive
 			 isInteractive = false;
+		  }		  
+          else if (arg == "-ish")
+		  {
+			 // Set not interactive
+			 appName = "ish";
+		  }		  
+          else if (arg == "-sire")
+		  {
+			 // Set not interactive
+			 appName = "sire";
+		  }		  
+          else if (arg == "-env")
+		  {
+			 // Set not interactive
+			 appName = "env";
 		  }
 		  else if (arg == "-C")
 		  {
