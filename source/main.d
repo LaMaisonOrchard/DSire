@@ -29,7 +29,7 @@ int main(string[] args)
    string script;
 
    setEnvironment(args[0..$]);
-
+   
    switch(AppName())
    {
        case "ish":

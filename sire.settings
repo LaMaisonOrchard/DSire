@@ -1,0 +1,12 @@
+{
+    "build": {
+        "toolchain": "default",
+        "arch": "default",
+        "verbose": false
+    },
+    "debug": {
+        "external_console": true,
+        "run_args": " -ish",
+        "working_dir": null
+    }
+}
