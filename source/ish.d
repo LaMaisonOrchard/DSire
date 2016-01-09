@@ -39,7 +39,7 @@ public class Ish
    //
    // Create a ish interpreter
    //
-   this(File out_fp, File err_fp, string[string] env, string cwd, string[] args ...)
+   this(File out_fp, File err_fp, Env env, string cwd, string[] args ...)
    {
       this.first    = true;
       this.out_fp   = out_fp;
@@ -47,14 +47,14 @@ public class Ish
       this.env      = env;
       this.args     = args;
       this.cwd      = cwd;
-      env["PWD"]    = cwd;
+      this.env.setEnv(cwd);
    }
    
    /////////////////////////////////////////////////////
    //
    // Create a ish interpreter
    //
-   this(OutBuffer out_buf, File err_fp, string[string] env, string cwd, string[] args ...)
+   this(OutBuffer out_buf, File err_fp, Env env, string cwd, string[] args ...)
    {
       this.first    = true;
       this.out_buf  = out_buf;
@@ -62,7 +62,7 @@ public class Ish
       this.env      = env;
       this.args     = args;
       this.cwd      = cwd;
-      env["PWD"]    = cwd;
+      this.env.setEnv(cwd);
    }
    
    public int ExitStatus()
@@ -444,7 +444,7 @@ public class Ish
                this.sub_shell ~= arg.idup;
             }
             
-            auto pipes = pipeProcess(args, Redirect.stdin | Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+            auto pipes = pipeProcess(args, Redirect.stdin | Redirect.stdout, this.env.raw, Config.newEnv | Config.suppressConsole, cwd);
             this.sub_pid = pipes.pid;
             this.sub_fp  = pipes.stdin;
             this.sub_out = pipes.stdout;
@@ -583,7 +583,7 @@ public class Ish
                
             case state.BACK_QUOTE: 
                auto output = new OutBuffer();
-               auto shell  = new Ish(output, parent.err_fp, parent.env, parent.cwd, parent.args);
+               auto shell  = new Ish(output, parent.err_fp, parent.env.dup, parent.cwd, parent.args);
                
                shell.run(this.arg);
                return Decode(output.toString());
@@ -899,7 +899,7 @@ public class Ish
         void help();        
         void fullHelp();
         
-        int run(const(char)[][] ...);
+        int run(Env env, const(char)[][] ...);
     }
     
     public static class CmdException : Exception
@@ -939,7 +939,7 @@ public class Ish
    
     /////////////////////////////////////////////////////
     //
-    // Process a hell command
+    // Process a shell command
     //
     // RETURN False is returned in the shell exits
     //
@@ -1023,7 +1023,7 @@ public class Ish
                 {
                     if ((expanded.length > 1) && cmd.matchOp(expanded[1]))
                     {
-                        exitStatus = cmd.run(expanded);
+                        exitStatus = cmd.run(this.env, expanded);
                         return true;
                     }
                 }  
@@ -1033,7 +1033,7 @@ public class Ish
                 {
                     if (cmd.matchCmd(expanded[0]))
                     {
-                        exitStatus = cmd.run(expanded);
+                        exitStatus = cmd.run(this.env, expanded);
                         return true;
                     }
                 } 
@@ -1069,7 +1069,7 @@ version ( Windows )
                     string[] args;
                     args ~= appName;
                     foreach (const(char)[] arg; expanded[1..$]) args ~= arg.idup;
-                    auto shell  = new Ish(this.err_fp, this.err_fp, this.env, this.cwd, args);
+                    auto shell  = new Ish(this.err_fp, this.err_fp, this.env.dup, this.cwd, args);
                      
                     foreach (inputLine; input.byLine())
                     {
@@ -1087,7 +1087,7 @@ version ( Windows )
                         
                     char[] buffer;
                     expanded[0] = fullPath;
-                    auto pipes = pipeProcess(expanded, Redirect.stdout, this.env, Config.newEnv | Config.suppressConsole, cwd);
+                    auto pipes = pipeProcess(expanded, Redirect.stdout, this.env.raw, Config.newEnv | Config.suppressConsole, cwd);
                     scope(exit) exitStatus = wait(pipes.pid);
                         
                     while (0 < pipes.stdout.readln(buffer))
@@ -1192,7 +1192,7 @@ version ( Windows )
    File            sub_out; // Sub-shell output
    Pid             sub_pid;
    string[]        sub_shell;
-   string[string]  env;
+   Env             env;
    string[]        args;
    string          cwd;
    int             exitStatus = 0;
@@ -1234,7 +1234,7 @@ class AsignCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {      
         auto name = items[0];
             
@@ -1247,7 +1247,7 @@ class AsignCmd : Ish.Command
             args[idx] = item.idup;
         }
                      
-        //env.setEnv(name, args);
+        env.setEnv(name, args);
                
         // No errors
         return 0;
@@ -1271,7 +1271,7 @@ class EchoCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {      
         items = items[1..$];
                      
@@ -1326,7 +1326,7 @@ class WhichCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     { 
        items = items[1..$];
                      
@@ -1385,7 +1385,7 @@ class CdCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         items = items[1..$];
                
@@ -1400,7 +1400,7 @@ class CdCmd : Ish.Command
             {
                 // Try to change directory
                 chdir(items[0]);
-                //env["PWD"] = getcwd(); // TODO
+                env.setEnv("PWD", getcwd());
             }
             catch (Exception ex)
             {
@@ -1429,7 +1429,7 @@ class MkdirCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     { 
         items = items[1..$];
                
@@ -1476,7 +1476,7 @@ class RmdirCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         items = items[1..$]; 
 
@@ -1527,7 +1527,7 @@ class TouchCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         items = items[1..$];
         if (items.length > 0)
@@ -1575,7 +1575,7 @@ class CopyCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         items = items[1..$];
             
@@ -1617,7 +1617,7 @@ class MoveCmd : Ish.Command
         help();
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         items = items[1..$];
         if (items.length != 2)
@@ -1647,7 +1647,7 @@ class MoveCmd : Ish.Command
 
 ///////// ENVIRONMENT Manipulation /////////////////////////////////////////////////////
    
-public string getEnv(const(char)[] name, string[string] env, string[] args = null)
+public string getEnv(const(char)[] name, Env env, string[] args = null)
 {
 version ( Windows )
 {
@@ -1670,21 +1670,13 @@ version ( Windows )
    else
    {
       // Expand the names environment variable
-      auto p = (name in env);
-      if (p is null)
-      {
-         return "";
-      }
-      else
-      {
-         return *p;
-      }
+      return env.getEnv(name);
    }
 }
 
 
    
-public void setEnv(const(char)[] name, string value, ref string[string] env, ref string[] args)
+public void setEnv(const(char)[] name, string value, ref Env env, ref string[] args)
 {
 version ( Windows )
 {
@@ -1703,55 +1695,11 @@ version ( Windows )
    }
    else
    {
-      env[name] = value;
+      env.setEnv(name, value);
    }
 }
    
-public void setEnv(const(char)[] name, string value, ref string[string] env)
-{
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   env[name] = value.idup;
-}
-   
-public void unsetEnv(const(char)[] name, ref string[string] env)
-{
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   auto p = (name in env);
-   if (p !is null)
-   {
-      // We need a way of genuinly removing this from the array TODO
-   	env.remove(name.idup);
-   }
-}
-
-
-public void defaultEnv(const(char)[] name, string value, ref string[string] env)
-{
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   auto p = (name in env);
-   if (p is null)
-   {
-      // Undefined variable
-      env[name] = value;
-   }
-   else
-   {
-      // Already defined
-   }
-}
-
+ 
 @property public pure string toUpper(const(char)[] name)
 {
    // TODO - this could be optimised
@@ -1835,21 +1783,16 @@ bool executableFile(const(char)[] name)
 //
 // RETURN The full path
 //
-public string getFullPath(string name, string[string] env = null)
+public string getFullPath(string name, Env env = thisEnv)
 {
     string tmp;
-version ( Windows )
-{
-    // If this does not have a suffix then add '.exe'
-    if (extension(name) == "")
+    version ( Windows )
     {
-        name = name ~ ".exe";
-    }
-}
-      
-    if (env == null)
-    {
-        env = environment.toAA();
+        // If this does not have a suffix then add '.exe'
+        if (extension(name) == "")
+        {
+            name = name ~ ".exe";
+        }
     }
       
     // Check for an absolute path
@@ -1876,78 +1819,77 @@ version ( Windows )
         }
     }
       
-version ( Windows )
-{
-    immutable(char) psep = ';';
+    version ( Windows )
+    {
+        immutable(char) psep = ';';
       
-    string[] varList1 =
-    [
-        "PROGRAMFILES",
-        "PROGRAMFILES(X86)",
-        "PROGRAMW6432",
-        "COMMONPROGRAMFILES",
-        "COMMONPROGRAMFILES(X86)",
-        "COMMONPROGRAMW6432"
-    ];
+        string[] varList1 =
+        [
+            "PROGRAMFILES",
+            "PROGRAMFILES(X86)",
+            "PROGRAMW6432",
+            "COMMONPROGRAMFILES",
+            "COMMONPROGRAMFILES(X86)",
+            "COMMONPROGRAMW6432"
+        ];
       
-    string[] varList2 =
-    [
-        "WINDIR",
-        "SystemRoot"
-    ];
+        string[] varList2 =
+        [
+            "WINDIR",
+            "SystemRoot"
+        ];
          
-    // The directory from which the application loaded.
-    tmp = thisExePath() ~ "/" ~ name;
-    if (executableFile(tmp))
-    {
-        return tmp;
-    }
-      
-    // The current directory for the parent process.
-    tmp = getcwd() ~ "/" ~ name;
-    if (executableFile(tmp))
-    {
-        return tmp;
-    }
-      
-    foreach(envVar; varList1)
-    {
-        tmp = .getEnv(envVar, env);
-        if (tmp.length > 0)
+        // The directory from which the application loaded.
+        tmp = thisExePath() ~ "/" ~ name;
+        if (executableFile(tmp))
         {
-            foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
+            return tmp;
+        }
+      
+        // The current directory for the parent process.
+        tmp = getcwd() ~ "/" ~ name;
+        if (executableFile(tmp))
+        {
+            return tmp;
+        }
+      
+        foreach(envVar; varList1)
+        {
+            tmp = .getEnv(envVar, env);
+            if (tmp.length > 0)
             {
-                if (executableFile(tmp1))
+                foreach (tmp1; dirEntries(tmp,name,SpanMode.depth))
                 {
-                  return tmp1;
+                    if (executableFile(tmp1))
+                    {
+                      return tmp1;
+                    }
+                }
+            }
+        }
+      
+        foreach(envVar; varList2)
+        {
+            tmp = .getEnv(envVar, env);
+            if (tmp.length > 0)
+            {
+                foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
+                {
+                    if (executableFile(tmp1))
+                    {
+                        return tmp1;
+                    }
                 }
             }
         }
     }
-      
-    foreach(envVar; varList2)
+    else
     {
-        tmp = .getEnv(envVar, env);
-        if (tmp.length > 0)
-        {
-            foreach (tmp1; dirEntries(tmp ~ "/System32",name,SpanMode.depth))
-            {
-                if (executableFile(tmp1))
-                {
-                    return tmp1;
-                }
-            }
-        }
+        immutable(char) psep = ':';
     }
-}
-else
-{
-    immutable(char) psep = ':';
-      
-}
 
     // The directories listed in the PATH environment variable.
-    auto path = .getEnv("PATH", env);
+    auto path = env.getEnv("PATH");
       
     int i = 0;
     while (i < path.length)

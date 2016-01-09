@@ -22,6 +22,7 @@ import std.stdio;
 import std.process;
 import std.file;
 import ish;
+import env;
 import appEnv;
 
 int main(string[] args)
@@ -51,7 +52,7 @@ int sireMain(string[] args)
    sireArgs(args);
 
    // Display the environment
-   foreach (string name, string value; Env())
+   foreach (string name, string value; thisEnv.raw)
    {
       writefln("[%s] = [%s]", name, value);
    }
@@ -105,7 +106,7 @@ int envMain(string[] args)
    int status = 0;
 
    // Display the environment
-   foreach (string name, string value; Env())
+   foreach (string name, string value; thisEnv.raw)
    {
       writefln("%s=%s", name, value);
    }
@@ -133,7 +134,7 @@ int ishMain(string[] args)
            input.open(Targets[0], "r");
     	     scope(exit) input.close();
 
-           auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
+           auto shell = new Ish(stdout, stderr, thisEnv.dup, thisEnv.getEnv("PWD"), Params());
     
            foreach (line; input.byLine())
            {
@@ -150,7 +151,7 @@ int ishMain(string[] args)
     }
     else
     {    
-        auto shell = new Ish(stdout, stderr, Env(), Env["PWD"], Params());
+        auto shell = new Ish(stdout, stderr, thisEnv.dup, thisEnv.getEnv("PWD"), Params());
     
         if (interactive) write("> ");
         foreach (line; input.byLine())

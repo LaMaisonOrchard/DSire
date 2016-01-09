@@ -7,6 +7,6 @@
     "debug": {
         "external_console": false,
         "run_args": " -ish",
-        "working_dir": ""
+        "working_dir": null
     }
 }

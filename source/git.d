@@ -20,6 +20,7 @@
 *****************************************************************************/
 
 import std.stdio;
+import env;
 import ish;
 
 static this()
@@ -43,7 +44,7 @@ class GitCmd : Ish.Command
         writeln("GIT stub");                
     }
         
-    public int run(const(char)[][] items ...)
+    public int run(Env env, const(char)[][] items ...)
     {
         writeln("GIT stub");
             

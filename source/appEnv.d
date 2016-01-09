@@ -22,15 +22,14 @@ import std.stdio;
 import core.stdc.stdlib;
 import std.process;
 import std.file;
-import ish;
 import env;
+import ish;
 
 public
 {
 	string         AppName() {return appName;}
 	string[]       Targets() {return targets;}
 	string[]       Params()  {return params;}
-	string[string] Env()     {return baseEnv;}
 	
 	bool interactive() @property
 	{
@@ -40,10 +39,6 @@ public
 
 	void setEnvironment(ref string[] args)
 	{
-	   baseEnv = environment.toAA();
-	   setEnv(environment.toAA());
-
-
 	   GetAppName();
 	   args = args[1..$];
 	  
@@ -103,7 +98,7 @@ public
 				}
 			 }
 			 
-			 setEnv(name, value, baseEnv); 
+			 setEnv(name, value); 
              i += 1;
 		  }
 		  else if ((arg.length > 2) && (arg[0..2] == "-U"))
@@ -119,7 +114,7 @@ public
 				}
 			 }
 			 
-			 unsetEnv(name, baseEnv);
+			 unsetEnv(name);
              i += 1;
 		  }
 		  else
@@ -133,58 +128,57 @@ public
 
 	version( Win32 )
 	{
-	   defaultEnv("OS",  "WIN32", baseEnv);
-	   defaultEnv("EXE", ".exe", baseEnv);
-	   defaultEnv("OBJ", ".obj", baseEnv);
-	   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
+	   defaultEnv("OS",  "WIN32");
+	   defaultEnv("EXE", ".exe");
+	   defaultEnv("OBJ", ".obj");
+	   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", thisEnv));
 	}
 	else version( Win64 )
 	{
-	   defaultEnv("OS",  "WIN64", baseEnv);
-	   defaultEnv("EXE", ".exe", baseEnv);
-	   defaultEnv("OBJ", ".obj", baseEnv);
-	   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", baseEnv), baseEnv);
+	   defaultEnv("OS",  "WIN64");
+	   defaultEnv("EXE", ".exe");
+	   defaultEnv("OBJ", ".obj");
+	   defaultEnv("EDITOR", Ish.getFullPath("notepad.exe", thisEnv));
 	}
 	else version( linux )
 	{
-	   defaultEnv("OS",  "LINUX", baseEnv);
-	   defaultEnv("EXE", "", baseEnv);
-	   defaultEnv("OBJ", ".o", baseEnv);
-	   defaultEnv("EDITOR", getFullPath("nano", baseEnv), baseEnv);
+	   defaultEnv("OS",  "LINUX");
+	   defaultEnv("EXE", "");
+	   defaultEnv("OBJ", ".o");
+	   defaultEnv("EDITOR", getFullPath("nano", thisEnv));
 	}
 	else version( OSX )
 	{
-	   defaultEnv("OS",  "OSX", baseEnv);
-	   defaultEnv("OBJ", ".o", baseEnv);
-	   defaultEnv("EXE", "", baseEnv);
+	   defaultEnv("OS",  "OSX");
+	   defaultEnv("OBJ", ".o");
+	   defaultEnv("EXE", "");
 	}
 	else version ( FreeBSD )
 	{
-	   defaultEnv("OS",  "FREEBSD", baseEnv);
-	   defaultEnv("OBJ", ".o", baseEnv);
-	   defaultEnv("EXE", "", baseEnv);
+	   defaultEnv("OS",  "FREEBSD");
+	   defaultEnv("OBJ", ".o");
+	   defaultEnv("EXE", "");
 	}
 	else version (Solaris)
 	{
-	   defaultEnv("OS",  "SOLARIS", baseEnv);
-	   defaultEnv("OBJ", ".o", baseEnv);
-	   defaultEnv("EXE", "", baseEnv);
+	   defaultEnv("OS",  "SOLARIS");
+	   defaultEnv("OBJ", ".o");
+	   defaultEnv("EXE", "");
 	}
 	else
 	{
 	   static assert( false, "Unsupported platform" );
 	}
 
-	   defaultEnv("TMP",    tempDir(), baseEnv);
-	   defaultEnv("PWD",    getcwd(),  baseEnv);
-	   defaultEnv("CONFIG", "DEBUG",   baseEnv);
+	   defaultEnv("TMP",    tempDir());
+	   defaultEnv("PWD",    getcwd());
+	   defaultEnv("CONFIG", "DEBUG");
 	}
 }
 
 
 private
 {
-	string[string] baseEnv;
 	string         appName = "sire";
 	string[]       targets;
 	string[]       params;
@@ -204,11 +198,11 @@ private
 	   if (i >= 0)
 	   {
 		   appName = app[i+1..$];
-		   setEnv("DHUT_BIN", app[0..i+1], baseEnv);
+		   setEnv("DHUT_BIN", app[0..i+1]);
 
 		   if ((i > 4) && (app[i-4..i] == "/bin") || (app[i-4..i] == "\\bin"))
 		   {
-			   setEnv("DHUT", app[0..i-3], baseEnv);
+			   setEnv("DHUT", app[0..i-3]);
 		   }
 	   }
 	   else

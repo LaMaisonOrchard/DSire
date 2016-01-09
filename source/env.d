@@ -24,99 +24,224 @@ import std.stdio;
 import std.conv;
 import std.ascii;  // ASCII support
 //import std.uni;  // Unicode support
+import std.process;
 
 import line_processing;
 
-string[string] envRaw;  // The raw native version of the environment
-string[string] envEnc;  // The encoded version of the environment
+private Env baseEnv;
 
-/*************************************************************
- * Configure the environment from the native environment
- **/
-void setEnv(string[string] env)
+public Env thisEnv()  @property   {return baseEnv;}
+
+static this()
 {
-   if ("DHUT_ENC" in env)
-   {
-      envEnc = env;
-
-      foreach(key, value; envEnc)
-      {
-         envRaw[key] = Concatinate(' ', Decode(value));
-      }
-
-      envRaw.remove("DHUT_ENC");
-   }
-   else
-   {
-      envRaw = env;
-
-      foreach(key, value; envRaw)
-      {
-         envEnc[key] = Encode(NormalisePath(value));
-      }
-
-      envEnc["DHUT_ENC"] = "1";
-   }
+    baseEnv = Env(environment.toAA());
 }
+
+public struct Env
+{
+    public
+    {
+        /*************************************************************
+         * Configure the environment from the native environment
+         **/
+        this(string[string] aa)
+        {
+            if ("DHUT_ENC" in aa)
+            {
+                envEnc = aa;
+
+                foreach(key, value; envEnc)
+                {
+                    envRaw[key] = Concatinate(' ', Decode(value));
+                }
+
+                envRaw.remove("DHUT_ENC");
+            }
+            else
+            {
+                envRaw = aa;
+
+                foreach(key, value; envRaw)
+                {
+                    envEnc[key] = Encode(NormalisePath(value));
+                }
+
+                envEnc["DHUT_ENC"] = "1";
+            }
+        }
+        
+        /*************************************************************
+         * Create a duplicate copy of the environment
+         **/
+        Env dup() @property
+        {
+            Env rtn;            
+            rtn.envRaw = envRaw.dup;            
+            rtn.envEnc = envEnc.dup;
+            
+            return rtn;
+        }
+        
+        const(string[string]) raw() @property {return envRaw;}
+        const(string[string]) env() @property {return envEnc;}
+        
+        public string getEnv(const(char)[] name)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            // Expand the names environment variable
+            auto p = (name in envRaw);
+            if (p is null)
+            {
+                return "";
+            }
+            else
+            {
+                return *p;
+            }
+        }
+        
+        public string getEnvEnc(const(char)[] name)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            
+            // Expand the names environment variable
+            auto p = (name in envEnc);
+            if (p is null)
+            {
+                return "";
+            }
+            else
+            {
+                return *p;
+            }
+        }
+   
+        public void setEnv(const(char)[] name, string[] value ...)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            
+            foreach (ref item ; value)
+            {
+                item = NormalisePath(item);
+            }
+   
+            envRaw[name] = Concatinate(' ', value);
+            envEnc[name] = Encode(value);
+        }
+   
+        public void setEnvEnc(const(char)[] name, string value)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            
+            envRaw[name] = Concatinate(' ', Decode(value));
+            envEnc[name] = value;
+        }
+   
+        public void unsetEnv(const(char)[] name)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                string nm = name.toUpper;
+            }
+            else
+            {
+                string nm = name.idup;
+            }
+
+            auto p = (name in envRaw);
+            if (p !is null)
+            {
+                envRaw.remove(nm);
+                envEnc.remove(nm);
+            }
+        }
+        
+        public void defaultEnv(const(char)[] name, string[] value ...)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            
+            auto p = (name in envRaw);
+            if (p is null)
+            {
+                // Undefined variable
+                setEnv(name, value);
+            }
+            else
+            {
+                // Already defined
+            }
+        }
+        
+        public void defaultEnvEnc(const(char)[] name, string value)
+        {
+            version ( Windows )
+            {
+                // Force the name to uppercase
+                name = name.toUpper;
+            }
+            
+            auto p = (name in envRaw);
+            if (p is null)
+            {
+                // Undefined variable
+                setEnvEnc(name, value);
+            }
+            else
+            {
+                // Already defined
+            }
+        }
+
+
+
+    }
+    
+    private
+    {
+        string[string] envRaw;  // The raw native version of the environment
+        string[string] envEnc;  // The encoded version of the environment
+    }
+}
+
 
 ///////// ENVIRONMENT Manipulation /////////////////////////////////////////////////////
    
 public string getEnv(const(char)[] name)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   // Expand the names environment variable
-   auto p = (name in envRaw);
-   if (p is null)
-   {
-      return "";
-   }
-   else
-   {
-      return *p;
-   }
+    return baseEnv.getEnv(name);
 }
 
    
 public string getEnvEnc(const(char)[] name)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
+    return baseEnv.getEnvEnc(name);
 }
-   // Expand the names environment variable
-   auto p = (name in envEnc);
-   if (p is null)
-   {
-      return "";
-   }
-   else
-   {
-      return *p;
-   }
-}
-
-
 
    
 public void setEnv(const(char)[] name, string[] value ...)
 {
-version ( Windows )
-{
-    // Force the name to uppercase
-    name = name.toUpper;
-}
-    foreach (ref item ; value)
-    {
-        item = NormalisePath(item);
-    }
-   
-    envRaw[name] = Concatinate(' ', value);
-    envEnc[name] = Encode(value);
+    baseEnv.setEnv(name, value);
 }
 
 
@@ -124,77 +249,26 @@ version ( Windows )
    
 public void setEnvEnv(const(char)[] name, string value)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   envRaw[name] = Concatinate(' ', Decode(value));
-   envEnc[name] = value;
+    baseEnv.setEnvEnc(name, value);
 }
 
 
    
 public void unsetEnv(const(char)[] name)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   string nm = name.toUpper;
-}
-else
-{
-   string nm = name.idup;
-}
-
-   auto p = (name in envRaw);
-   if (p !is null)
-   {
-   	envRaw.remove(nm);
-   	envEnc.remove(nm);
-   }
+    baseEnv.unsetEnv(name);
 }
 
 
-public void defaultEnv(const(char)[] name, string value)
+public void defaultEnv(const(char)[] name, string[] value ...)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   auto p = (name in envRaw);
-   if (p is null)
-   {
-      // Undefined variable
-      envRaw[name] = value;
-      envEnc[name] = Encode(NormalisePath(value));
-   }
-   else
-   {
-      // Already defined
-   }
+    baseEnv.defaultEnv(name, value);
 }
 
 
 public void defaultEnvEnc(const(char)[] name, string value)
 {
-version ( Windows )
-{
-   // Force the name to uppercase
-   name = name.toUpper;
-}
-   auto p = (name in envRaw);
-   if (p is null)
-   {
-      // Undefined variable
-      envRaw[name] = Concatinate(' ', Decode(value));
-      envEnc[name] = value;
-   }
-   else
-   {
-      // Already defined
-   }
+    baseEnv.defaultEnvEnc(name, value);
 }
 
 @property public pure string toUpper(const(char)[] name)
@@ -224,7 +298,7 @@ public pure bool allDigits(const(char)[] name)
    return true;
 }
 
-string Concatinate(char ch, string[] list)
+private string Concatinate(char ch, string[] list)
 {
    if (list.length == 0)
    {
