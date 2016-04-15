@@ -37,6 +37,20 @@ static this()
     baseEnv = Env(environment.toAA());
 }
 
+version ( Windows )
+{
+    enum
+    {
+        PSEP = ';'
+    }
+}
+else
+{    enum
+    {
+        PSEP = ':'
+    }
+}
+
 public struct Env
 {
     public
@@ -46,28 +60,7 @@ public struct Env
          **/
         this(string[string] aa)
         {
-            if ("DHUT_ENC" in aa)
-            {
-                envEnc = aa;
-
-                foreach(key, value; envEnc)
-                {
-                    envRaw[key] = Concatinate(' ', Decode(value));
-                }
-
-                envRaw.remove("DHUT_ENC");
-            }
-            else
-            {
-                envRaw = aa;
-
-                foreach(key, value; envRaw)
-                {
-                    envEnc[key] = Encode(NormalisePath(value));
-                }
-
-                envEnc["DHUT_ENC"] = "1";
-            }
+            envRaw = aa.dup;
         }
         
         /*************************************************************
@@ -76,15 +69,19 @@ public struct Env
         Env dup() @property
         {
             Env rtn;            
-            rtn.envRaw = envRaw.dup;            
-            rtn.envEnc = envEnc.dup;
+            rtn.envRaw = envRaw.dup; 
             
             return rtn;
-        }
-        
-        const(string[string]) raw() @property {return envRaw;}
-        const(string[string]) env() @property {return envEnc;}
-        
+        }   
+               
+        /*************************************************************
+         * Create a duplicate copy of the environment
+         **/
+        string[string] raw() @property
+        {
+            return envRaw;
+        } 
+             
         public string getEnv(const(char)[] name)
         {
             version ( Windows )
@@ -92,6 +89,7 @@ public struct Env
                 // Force the name to uppercase
                 name = name.toUpper;
             }
+            
             // Expand the names environment variable
             auto p = (name in envRaw);
             if (p is null)
@@ -102,26 +100,11 @@ public struct Env
             {
                 return *p;
             }
-        }
-        
-        public string getEnvEnc(const(char)[] name)
+        }  
+             
+        public string[] getEnvList(const(char)[] name)
         {
-            version ( Windows )
-            {
-                // Force the name to uppercase
-                name = name.toUpper;
-            }
-            
-            // Expand the names environment variable
-            auto p = (name in envEnc);
-            if (p is null)
-            {
-                return "";
-            }
-            else
-            {
-                return *p;
-            }
+            return SplitEnvValue(getEnv(name));
         }
    
         public void setEnv(const(char)[] name, string[] value ...)
@@ -132,25 +115,17 @@ public struct Env
                 name = name.toUpper;
             }
             
+            char[] set;
             foreach (ref item ; value)
             {
-                item = NormalisePath(item);
+                if (set.length > 0)
+                {
+                    set ~= PSEP;
+                }
+                set ~= item;
             }
    
-            envRaw[name] = Concatinate(' ', value);
-            envEnc[name] = Encode(value);
-        }
-   
-        public void setEnvEnc(const(char)[] name, string value)
-        {
-            version ( Windows )
-            {
-                // Force the name to uppercase
-                name = name.toUpper;
-            }
-            
-            envRaw[name] = Concatinate(' ', Decode(value));
-            envEnc[name] = value;
+            envRaw[name] = set.idup;
         }
    
         public void unsetEnv(const(char)[] name)
@@ -165,11 +140,10 @@ public struct Env
                 string nm = name.idup;
             }
 
-            auto p = (name in envRaw);
+            auto p = (nm in envRaw);
             if (p !is null)
             {
                 envRaw.remove(nm);
-                envEnc.remove(nm);
             }
         }
         
@@ -192,26 +166,6 @@ public struct Env
                 // Already defined
             }
         }
-        
-        public void defaultEnvEnc(const(char)[] name, string value)
-        {
-            version ( Windows )
-            {
-                // Force the name to uppercase
-                name = name.toUpper;
-            }
-            
-            auto p = (name in envRaw);
-            if (p is null)
-            {
-                // Undefined variable
-                setEnvEnc(name, value);
-            }
-            else
-            {
-                // Already defined
-            }
-        }
 
 
 
@@ -220,7 +174,6 @@ public struct Env
     private
     {
         string[string] envRaw;  // The raw native version of the environment
-        string[string] envEnc;  // The encoded version of the environment
     }
 }
 
@@ -230,26 +183,17 @@ public struct Env
 public string getEnv(const(char)[] name)
 {
     return baseEnv.getEnv(name);
-}
+}  
 
-   
-public string getEnvEnc(const(char)[] name)
+public string[] getEnvList(const(char)[] name)
 {
-    return baseEnv.getEnvEnc(name);
+    return baseEnv.getEnvList(name);
 }
 
    
 public void setEnv(const(char)[] name, string[] value ...)
 {
     baseEnv.setEnv(name, value);
-}
-
-
-
-   
-public void setEnvEnv(const(char)[] name, string value)
-{
-    baseEnv.setEnvEnc(name, value);
 }
 
 
@@ -263,12 +207,6 @@ public void unsetEnv(const(char)[] name)
 public void defaultEnv(const(char)[] name, string[] value ...)
 {
     baseEnv.defaultEnv(name, value);
-}
-
-
-public void defaultEnvEnc(const(char)[] name, string value)
-{
-    baseEnv.defaultEnvEnc(name, value);
 }
 
 @property public pure string toUpper(const(char)[] name)
@@ -298,30 +236,28 @@ public pure bool allDigits(const(char)[] name)
    return true;
 }
 
-private string Concatinate(char ch, string[] list)
+public string[] SplitEnvValue(string value)
 {
-   if (list.length == 0)
-   {
-      return "";
-   }
-   else if (list.length == 1)
-   {
-      return list[0];
-   }
-   else
-   {
-      char[] work;
-      work.length = list[0].length;
-      work[0..$] = list[0][0..$];
-
-      size_t idx = work.length;
-      foreach (item; list)
-      {
-         work.length += item.length +1;
-         work[idx++] = ' ';
-         work[idx..$] = item[0..$];
-      }
-
-      return work.idup;
-   }
+    string[] list;
+    
+    int i = 0;
+    
+    while (i < value.length)
+    {
+        int j = i;
+        while ((j < value.length) && (value[j] != PSEP))
+        {
+            j += 1;
+        }
+        
+        list ~= value[i..j];
+        i = j+1;
+    }
+   
+    if (list.length == 0)
+    {
+        list ~= "";
+    }
+   
+    return list;
 }

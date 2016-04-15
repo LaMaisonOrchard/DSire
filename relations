@@ -18,9 +18,11 @@ info
    gitk
 }
 
+OBJ = `echo source/*.d` | *.d | *.o;
+
 // SIRE dependencies ////////////////////////////////////////////////
 
-*/sire$(EXE) | sire.d env.d lib/ish.d lib/git.d lib/url.d
+*/sire$(EXE) | `echo source/*.d`
 {
    mkdir -p $(1)
    $(DMD) $(DEPS) -of$(TARGET)
@@ -31,7 +33,6 @@ info
 
 */ish$(EXE) | */sire$(EXE) 
 {
-   mkdir -p $(1)
    cp $(DEPS) $(TARGET)
 }
 

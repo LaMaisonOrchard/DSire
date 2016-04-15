@@ -122,7 +122,7 @@ int ishMain(string[] args)
     int status = 0;
     
     ishArgs(args, interactive);
-    
+        
     File input = stdin;
     
     if (Targets.length > 0)
@@ -170,7 +170,7 @@ int ishMain(string[] args)
 void ishArgs(ref string[] args, ref bool interactive)
 {
    // Read and variable definitions
-   interactive = true; // Interactive by default
+   interactive = true; // Assume interactive
    
    int i = 0; // input parmeter
    while (i < args.length)

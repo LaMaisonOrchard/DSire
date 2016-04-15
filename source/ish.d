@@ -19,6 +19,7 @@
 
 *****************************************************************************/
 import std.stdio;
+import std.concurrency;
 import std.container;
 import std.ascii;  // ASCII support
 //import std.uni;  // Unicode support
@@ -67,11 +68,19 @@ public class Ish
    
    public int ExitStatus()
    {
+    try{
+        
       // Is there a sub-shell
       if (sub_fp.isOpen())
       {
          this.exitStatus = finishSubShell();
+    stderr.writeln("5)");
       }
+      
+    }
+    catch
+    {    stderr.writeln("5.1)");
+    }
       
       return this.exitStatus;
    }
@@ -453,9 +462,11 @@ public class Ish
             if (input.length > 0)
             {
                this.sub_fp.writeln(input);
-               writeln(input);
             }
-         }
+ 
+            passThrough(sub_out, out_fp);
+     writeln("1)");
+        }
          catch (Exception ex)
          {
             // Report and errors thrown by the process
@@ -474,7 +485,7 @@ public class Ish
       
       return more;
    }
-
+ 
    
    /////////////////////////////////////////////////////
    //
@@ -482,18 +493,16 @@ public class Ish
    //
    int finishSubShell()
    {
-      if (sub_fp.isOpen())
+     writeln("2)");
+     if (sub_fp.isOpen())
       {
-         this.sub_fp.close();
+     writeln("3)");
+        this.sub_fp.close();
+    writeln("4)");
 
-         foreach (line; this.sub_out.byLine())
-         {
-             out_fp.writeln(line);
-         }
-      
-         //auto pid = spawnProcess(this.sub_shell, stdin, out_fp, err_fp, this.env, Config.newEnv | Config.suppressConsole, cwd);
-      
-         return wait(this.sub_pid);
+    passThroughJoin();
+    auto rtn = wait(this.sub_pid);
+         return rtn;
       }
       else
       {
@@ -1929,4 +1938,64 @@ public string getFullPath(string name, Env env = thisEnv)
 
     return "";
 }
+
+
+public void passThrough(File from, File to)
+{
+    pass_through = spawn(&passThroughThread, thisTid);
+
+    // Send the file handles.
+    send(pass_through, from.fileno, to.fileno);
+}
+
+public int passThroughJoin()
+{
+    int rtn = -1;
+    
+    receive(
+        (int status)
+        {
+            rtn = status;
+        }
+    );
+    
+    return rtn;
+}
+
+
+private Tid pass_through;
+  
+private void passThroughThread(Tid ownerTid)
+{
+    // Get the in and out file handles.
+    File inFile;
+    File outFile;
+    receive(
+        (int from, int to)
+        {
+            inFile.fdopen(from, "r");
+            outFile.fdopen(to, "w");
+        }
+    );
+           outFile.writeln("check2");
+    try
+    { 
+        char[1] buffer;
+        while (inFile.isOpen() && !inFile.eof())
+        {
+           outFile.rawWrite(inFile.rawRead(buffer));
+        }
+    }
+    catch
+    {
+    }
+    
+    inFile.close();
+    //outFile.close();
+    
+    writeln("out2");
+    send(ownerTid, 1);
+    writeln("out3");
+ }
+
 

@@ -1,17 +1,20 @@
 
 
-mkdir bin
+mkdir -p bin
 
 echo Build sire
-dmd -c -op sire.d
+cd source
+dmd -c -op main.d
 dmd -c -op appEnv.d 
-dmd -c -op lib/ish.d 
-dmd -c -op lib/git.d 
-dmd -c -op lib/url.d 
-dmd -c -op lib/rules.d 
-dmd -c -op lib/LineProcessing.d
-dmd -c -op lib/env.d
-dmd sire.o appEnv.o lib/ish.o lib/git.o lib/url.o lib/rules.o lib/LineProcessing.o lib/env.o -ofbin/sire
+dmd -c -op ish.d 
+dmd -c -op git.d 
+dmd -c -op url.d 
+dmd -c -op rules.d 
+dmd -c -op line_processing.d
+dmd -c -op env.d
+dmd main.o appEnv.o ish.o git.o url.o rules.o line_processing.o env.o -of../bin/sire
+
+cd ..
 
 echo Build ish
 cp bin/sire bin/ish
